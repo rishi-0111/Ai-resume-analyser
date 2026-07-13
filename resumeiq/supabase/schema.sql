@@ -240,5 +240,47 @@ CREATE POLICY "Users can delete their own career reports"
 
 
 -- ─────────────────────────────────────────────────────
+-- 9. Create the interview_sessions table (AI Interview Prep)
+-- ─────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.interview_sessions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  resume_id       UUID REFERENCES public.resumes(id) ON DELETE SET NULL,
+  job_title       TEXT NOT NULL,
+  job_description TEXT DEFAULT '',
+  questions       JSONB, -- Array of generated questions
+  answers         JSONB, -- Array of user answers
+  scores          JSONB, -- Overall, technical, communication, confidence, readiness
+  feedback        JSONB, -- Strengths, weaknesses, learning roadmap
+  status          TEXT DEFAULT 'pending', -- pending, in_progress, completed
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS on interview_sessions
+ALTER TABLE public.interview_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own interview sessions"   ON public.interview_sessions;
+DROP POLICY IF EXISTS "Users can insert their own interview sessions" ON public.interview_sessions;
+DROP POLICY IF EXISTS "Users can update their own interview sessions" ON public.interview_sessions;
+DROP POLICY IF EXISTS "Users can delete their own interview sessions" ON public.interview_sessions;
+
+CREATE POLICY "Users can view their own interview sessions"
+  ON public.interview_sessions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own interview sessions"
+  ON public.interview_sessions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own interview sessions"
+  ON public.interview_sessions FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own interview sessions"
+  ON public.interview_sessions FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────
 -- Done! Migration complete.
 -- ─────────────────────────────────────────────────────

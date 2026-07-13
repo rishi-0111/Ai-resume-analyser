@@ -27,6 +27,7 @@ const navItems = [
   { icon: Upload, label: "Upload & Analyze", href: "/dashboard/upload" },
   { icon: History, label: "History", href: "/dashboard/history" },
   { icon: Briefcase, label: "Market Intelligence", href: "/dashboard/market" },
+  { icon: TrendingUp, label: "Interview Prep", href: "/dashboard/interview" },
   { icon: TrendingUp, label: "Analysis", href: "/dashboard/analysis/analysis-001" },
   { icon: User, label: "Profile", href: "/dashboard/profile" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },

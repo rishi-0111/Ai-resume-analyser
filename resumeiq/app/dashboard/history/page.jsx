@@ -16,11 +16,13 @@ import {
   Loader2,
   RefreshCw,
   Briefcase,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@/lib/context/UserContext";
 import { useToast } from "@/lib/context/ToastContext";
 import { getResumes, deleteResume, getCareerReports, deleteCareerReport } from "@/lib/services/resumeService";
+import { interviewService } from "@/lib/services/interviewService";
 import { formatDate, getScoreColor, getScoreBgColor, getScoreLabel } from "@/lib/utils";
 
 const sortOptions = ["Newest First", "Oldest First", "Highest Score", "Lowest Score"];
@@ -32,6 +34,7 @@ export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState("resumes"); // 'resumes' or 'market'
   const [resumes, setResumes] = useState([]);
   const [reports, setReports] = useState([]);
+  const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("Newest First");
@@ -49,13 +52,15 @@ export default function HistoryPage() {
     
     Promise.all([
       getResumes(user.id),
-      getCareerReports(user.id)
-    ]).then(([resumesData, reportsData]) => {
+      getCareerReports(user.id),
+      interviewService.getSessions().catch(() => []) // fail gracefully
+    ]).then(([resumesData, reportsData, interviewsData]) => {
       if (resumesData.error || reportsData.error) {
         showToast("Failed to load history.", "error");
       } else {
         setResumes(resumesData.resumes);
         setReports(reportsData.reports);
+        setInterviews(interviewsData);
       }
       setLoading(false);
     });
@@ -93,7 +98,27 @@ export default function HistoryPage() {
       return 0;
     });
 
-  const currentData = activeTab === "resumes" ? filteredResumes : filteredReports;
+  // Filter + sort for Interviews
+  const filteredInterviews = interviews
+    .filter((h) =>
+      h.job_title.toLowerCase().includes(search.toLowerCase()) ||
+      (h.resumes?.title ?? "").toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sort === "Newest First") return new Date(b.created_at) - new Date(a.created_at);
+      if (sort === "Oldest First") return new Date(a.created_at) - new Date(b.created_at);
+      const scoreA = a.scores?.overall ?? 0;
+      const scoreB = b.scores?.overall ?? 0;
+      if (sort === "Highest Score") return scoreB - scoreA;
+      if (sort === "Lowest Score") return scoreA - scoreB;
+      return 0;
+    });
+
+  const currentData = activeTab === "resumes" 
+    ? filteredResumes 
+    : activeTab === "market" 
+      ? filteredReports 
+      : filteredInterviews;
 
   // Reset pagination when filter/sort/tab changes
   useEffect(() => {
@@ -125,6 +150,19 @@ export default function HistoryPage() {
     } else {
       setReports((prev) => prev.filter((r) => r.id !== report.id));
       showToast("Report deleted.", "success");
+    }
+    setDeletingId(null);
+  };
+
+  const handleDeleteInterview = async (interview) => {
+    if (!confirm(`Delete interview session for "${interview.job_title}"?`)) return;
+    setDeletingId(interview.id);
+    try {
+      await interviewService.deleteSession(interview.id);
+      setInterviews((prev) => prev.filter((r) => r.id !== interview.id));
+      showToast("Interview session deleted.", "success");
+    } catch (err) {
+      showToast("Failed to delete interview session.", "error");
     }
     setDeletingId(null);
   };
@@ -185,6 +223,15 @@ export default function HistoryPage() {
         >
           <Briefcase className="w-4 h-4" />
           Market Intelligence
+        </button>
+        <button
+          onClick={() => setActiveTab("interviews")}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === "interviews" ? "border-primary text-primary" : "border-transparent text-secondary-text hover:text-primary-text"
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          Interviews
         </button>
       </div>
 
@@ -258,14 +305,14 @@ export default function HistoryPage() {
                 className="text-center py-20"
               >
                 <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center mx-auto mb-4">
-                  {activeTab === "resumes" ? <FileText className="w-8 h-8 text-muted" /> : <Briefcase className="w-8 h-8 text-muted" />}
+                  {activeTab === "resumes" ? <FileText className="w-8 h-8 text-muted" /> : activeTab === "market" ? <Briefcase className="w-8 h-8 text-muted" /> : <MessageSquare className="w-8 h-8 text-muted" />}
                 </div>
-                <h3 className="font-semibold text-lg mb-1">No {activeTab === "resumes" ? "analyses" : "reports"} found</h3>
+                <h3 className="font-semibold text-lg mb-1">No {activeTab === "resumes" ? "analyses" : activeTab === "market" ? "reports" : "interviews"} found</h3>
                 <p className="text-secondary-text text-sm mb-6">
-                  {search ? "Try adjusting your search" : `Generate your first ${activeTab === "resumes" ? "resume analysis" : "market report"} to get started`}
+                  {search ? "Try adjusting your search" : `Generate your first ${activeTab === "resumes" ? "resume analysis" : activeTab === "market" ? "market report" : "mock interview"} to get started`}
                 </p>
                 <Link
-                  href={activeTab === "resumes" ? "/dashboard/upload" : "/dashboard/market"}
+                  href={activeTab === "resumes" ? "/dashboard/upload" : activeTab === "market" ? "/dashboard/market" : "/dashboard/interview"}
                   className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-6 py-2.5 rounded-button hover:bg-accent transition-all hover:shadow-glow-sm text-sm"
                 >
                   {activeTab === "resumes" ? "Upload Resume" : "Generate Report"}
@@ -286,8 +333,10 @@ export default function HistoryPage() {
                   <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
                     {activeTab === "resumes" ? (
                       <FileText className="w-6 h-6 text-primary" />
-                    ) : (
+                    ) : activeTab === "market" ? (
                       <Briefcase className="w-6 h-6 text-primary" />
+                    ) : (
+                      <MessageSquare className="w-6 h-6 text-primary" />
                     )}
                   </div>
 
@@ -307,11 +356,18 @@ export default function HistoryPage() {
                           {item.ai_report.marketReadinessScore >= 75 ? 'High Readiness' : 'Needs Improvement'}
                         </span>
                       )}
+                      {activeTab === "interviews" && item.scores && (
+                        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${item.scores.overall >= 75 ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                          {item.scores.overall >= 75 ? 'Strong Fit' : 'Needs Prep'}
+                        </span>
+                      )}
                     </div>
                     <p className="text-secondary-text text-sm mt-0.5">
                       {activeTab === "resumes" 
                         ? `${item.company ? `${item.company} · ` : ""}${item.file_name}`
-                        : `${item.location ? `${item.location} · ` : ""}Resume: ${item.resumes?.file_name || "Unknown"}`
+                        : activeTab === "market"
+                        ? `${item.location ? `${item.location} · ` : ""}Resume: ${item.resumes?.file_name || "Unknown"}`
+                        : `Resume: ${item.resumes?.title || "Untitled Resume"}`
                       }
                     </p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted">
@@ -339,18 +395,26 @@ export default function HistoryPage() {
                       <span className="text-muted text-sm">/100</span>
                     </div>
                   )}
+                  {activeTab === "interviews" && item.scores && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className={`font-heading text-3xl font-bold ${item.scores.overall >= 75 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                        {item.scores.overall}
+                      </span>
+                      <span className="text-muted text-sm">/100</span>
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
-                      href={activeTab === "resumes" ? `/dashboard/analysis/${item.id}` : `/dashboard/market/${item.id}`}
+                      href={activeTab === "resumes" ? `/dashboard/analysis/${item.id}` : activeTab === "market" ? `/dashboard/market/${item.id}` : `/dashboard/interview/${item.id}`}
                       className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-button bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all duration-200"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       View
                     </Link>
                     <button
-                      onClick={() => activeTab === "resumes" ? handleDeleteResume(item) : handleDeleteReport(item)}
+                      onClick={() => activeTab === "resumes" ? handleDeleteResume(item) : activeTab === "market" ? handleDeleteReport(item) : handleDeleteInterview(item)}
                       disabled={deletingId === item.id}
                       className="w-9 h-9 rounded-button bg-surface border border-border hover:border-danger hover:bg-danger/10 text-muted hover:text-danger flex items-center justify-center transition-all duration-200 disabled:opacity-40"
                       aria-label="Delete"

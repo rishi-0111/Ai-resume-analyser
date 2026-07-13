@@ -347,8 +347,9 @@ export default function AnalysisPage({ params }) {
               </BarChart>
             </ResponsiveContainer>
           </motion.div>
+        </div>
 
-          {/* Strengths */}
+        {/* Strengths */}
           <motion.div variants={itemVariants} className="bg-card border border-border rounded-card p-6">
             <h3 className="font-heading font-semibold mb-4 flex items-center gap-2 text-success">
               <CheckCircle className="w-4 h-4" />

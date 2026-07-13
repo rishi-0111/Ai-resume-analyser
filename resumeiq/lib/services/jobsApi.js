@@ -1,78 +1,94 @@
 /**
- * Service to interact with Job Market APIs (like JSearch via RapidAPI)
- * This fetches live job listings and salary data to compare against the user's resume.
+ * RapidAPI JSearch Service (Live Data Only)
+ * 
+ * Fetches real job postings from Google Jobs via JSearch API.
+ * Uses an in-memory cache to prevent duplicate rapidAPI charges for identical searches.
  */
 
-export async function fetchJobMarketData(jobTitle, location = '') {
+// Simple In-Memory Cache: { "JobTitle_Location": { timestamp, data } }
+const searchCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Fetches live job data based on a title and location.
+ * 
+ * @param {string} jobTitle 
+ * @param {string} location 
+ * @returns {Promise<Array>} Array of mapped job objects
+ */
+export async function fetchMarketJobs(jobTitle, location = "") {
   const apiKey = process.env.JOB_SEARCH_API_KEY;
-  const query = encodeURIComponent(`${jobTitle} ${location}`.trim());
-  
-  // If no API key is provided, we return mock data so development isn't blocked.
   if (!apiKey) {
-    console.warn("No JOB_SEARCH_API_KEY found. Returning mock market data.");
-    return getMockMarketData(jobTitle, location);
+    throw new Error("JOB_SEARCH_API_KEY is missing from environment variables.");
   }
 
+  const query = encodeURIComponent(`${jobTitle} ${location}`.trim());
+  const cacheKey = query.toLowerCase();
+
+  // 1. Check Cache
+  if (searchCache.has(cacheKey)) {
+    const cachedEntry = searchCache.get(cacheKey);
+    if (Date.now() - cachedEntry.timestamp < CACHE_TTL_MS) {
+      console.log(`[Cache Hit] Returning cached market data for: "${jobTitle} ${location}"`);
+      return cachedEntry.data;
+    } else {
+      searchCache.delete(cacheKey); // Evict stale cache
+    }
+  }
+
+  console.log(`[API Call] Fetching live JSearch data for: "${jobTitle} ${location}"`);
+
+  // 2. Fetch Live JSearch Data
   try {
-    // Note: The user's curl used /active-jb-count, but we need full job listings to extract skills.
-    // Assuming the search endpoint is /search for this API.
-    const response = await fetch(`https://linkedin-job-search-api.p.rapidapi.com/search?title=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(location)}`, {
+    const response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?query=${query}&page=1&num_pages=1`, {
       method: 'GET',
       headers: {
         'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': 'linkedin-job-search-api.p.rapidapi.com'
+        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`Job API Error: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`RapidAPI Error: ${response.status} - ${errorData.message || response.statusText}`);
     }
 
-    const result = await response.json();
+    const data = await response.json();
     
-    // Map the results to extract only the necessary fields for AI analysis
-    // This saves tokens and focuses Gemini on extracting trending skills and requirements.
-    const jobs = (result.data || []).map(job => ({
-      job_title: job.job_title,
-      employer_name: job.employer_name,
-      job_description: job.job_description,
-      job_city: job.job_city,
-      job_state: job.job_state,
-      job_min_salary: job.job_min_salary,
-      job_max_salary: job.job_max_salary,
-      job_apply_link: job.job_apply_link
-    }));
-
-    return jobs;
-  } catch (error) {
-    console.error("Failed to fetch job market data:", error);
-    // Fallback to mock data on failure to prevent full crash during dev/testing
-    return getMockMarketData(jobTitle, location);
-  }
-}
-
-/**
- * Provides mock market data for development or fallback purposes.
- */
-function getMockMarketData(jobTitle, location) {
-  return [
-    {
-      job_title: `${jobTitle} Professional`,
-      employer_name: "Tech Corp Inc.",
-      job_description: "Looking for an experienced professional with strong problem-solving skills, leadership, and technical expertise in modern frameworks.",
-      job_apply_link: "https://example.com/apply",
-      job_city: location || "Remote",
-      job_min_salary: 80000,
-      job_max_salary: 120000
-    },
-    {
-      job_title: `Senior ${jobTitle}`,
-      employer_name: "Innovate LLC",
-      job_description: "Seeking a senior candidate with excellent communication, scalable architecture experience, and mentoring capabilities.",
-      job_apply_link: "https://example.com/apply2",
-      job_city: location || "New York",
-      job_min_salary: 100000,
-      job_max_salary: 150000
+    if (!data.data || !Array.isArray(data.data.jobs)) {
+      throw new Error("Invalid response format from JSearch API.");
     }
-  ];
+
+    // 3. Map the response to save tokens for Gemini
+    // We strictly extract only what AI needs to save token bandwidth
+    const mappedJobs = data.data.jobs.map(job => ({
+      title: job.job_title,
+      company: job.employer_name,
+      location: job.job_city ? `${job.job_city}, ${job.job_state || ''}` : "Remote/Unknown",
+      description: job.job_description,
+      salary_range: (job.job_min_salary && job.job_max_salary) 
+        ? `$${job.job_min_salary} - $${job.job_max_salary}`
+        : "Not Specified",
+      apply_link: job.job_apply_link
+    })).filter(job => job.description); // Ensure we only keep jobs with descriptions
+
+    if (mappedJobs.length === 0) {
+      throw new Error("No valid jobs with descriptions found for this search.");
+    }
+
+    // Cap at top 5 jobs to keep AI prompt within context limits
+    const topJobs = mappedJobs.slice(0, 5);
+
+    // 4. Update Cache
+    searchCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: topJobs
+    });
+
+    return topJobs;
+
+  } catch (error) {
+    console.error("Error fetching market jobs:", error);
+    throw error; // Bubble up so the API route fails cleanly
+  }
 }

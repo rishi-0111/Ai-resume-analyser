@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
@@ -18,6 +18,14 @@ const steps = [
 const STEP_DURATION = 900; // ms per step
 
 export default function LoadingAnalysisPage() {
+  return (
+    <Suspense fallback={<div className="fixed inset-0 bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+      <LoadingAnalysisContent />
+    </Suspense>
+  );
+}
+
+function LoadingAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeId = searchParams.get("resumeId");

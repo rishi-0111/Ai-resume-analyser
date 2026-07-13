@@ -35,53 +35,9 @@ Education: B.S. Computer Science
 Skills: JavaScript, React, HTML, CSS, Git.
 `;
 
-// --- 2. Job API Fetcher (Replicated from jobsApi.js for testing) ---
-async function fetchJobMarketData(jobTitle, location) {
-  const apiKey = process.env.JOB_SEARCH_API_KEY;
-  const query = encodeURIComponent(`${jobTitle} ${location}`.trim());
-  
-  if (!apiKey) {
-    console.log("⚠️ No JOB_SEARCH_API_KEY found in .env.local. Using mock job data.");
-    return [
-      {
-        job_title: "Senior React Developer",
-        employer_name: "Innovate LLC",
-        job_description: "Looking for an expert React developer. Must know Next.js, TypeScript, and state management (Redux/Zustand). Experience with testing (Jest) is required.",
-        job_city: "New York",
-        job_min_salary: 120000,
-        job_max_salary: 160000
-      },
-      {
-        job_title: "Frontend Engineer",
-        employer_name: "Tech Corp",
-        job_description: "Seeking a frontend engineer with strong JavaScript, React, and TypeScript skills. GraphQL experience is a plus.",
-        job_city: "New York",
-        job_min_salary: 110000,
-        job_max_salary: 140000
-      }
-    ];
-  }
+import { fetchMarketJobs } from "./lib/services/jobsApi.js";
 
-  console.log("🌐 Fetching live jobs from JSearch API...");
-  const response = await fetch(`https://jsearch.p.rapidapi.com/search?query=${query}&page=1&num_pages=1`, {
-    headers: {
-      'X-RapidAPI-Key': apiKey,
-      'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
-    }
-  });
-
-  if (!response.ok) throw new Error(`Job API Error: ${response.statusText}`);
-  const result = await response.json();
-  
-  return (result.data || []).map(job => ({
-    job_title: job.job_title,
-    employer_name: job.employer_name,
-    job_description: job.job_description,
-    job_city: job.job_city,
-    job_min_salary: job.job_min_salary,
-    job_max_salary: job.job_max_salary
-  }));
-}
+// --- 2. Job API Fetcher is now imported directly from the live service ---
 
 // --- 3. Gemini System Prompt (Replicated from marketPrompts.js) ---
 const MARKET_ANALYSIS_SYSTEM_PROMPT = `You are an expert AI Career Coach and Job Market Analyst.
@@ -118,7 +74,7 @@ async function runTest() {
   console.log(`Target: ${targetJob} in ${targetLocation}\n`);
 
   try {
-    const marketData = await fetchJobMarketData(targetJob, targetLocation);
+    const marketData = await fetchMarketJobs(targetJob, targetLocation);
     console.log(`✓ Fetched ${marketData.length} jobs.`);
     
     if (!process.env.GEMINI_API_KEY) {

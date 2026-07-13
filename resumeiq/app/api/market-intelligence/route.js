@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { fetchJobMarketData } from "@/lib/services/jobsApi";
+import { fetchMarketJobs } from "@/lib/services/jobsApi";
 import { MARKET_ANALYSIS_SYSTEM_PROMPT } from "@/lib/services/ai/marketPrompts";
 import { GoogleGenAI } from "@google/genai";
 import { parseAIResponse } from "@/lib/services/ai/parser"; // Existing parser
