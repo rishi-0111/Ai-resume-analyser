@@ -8,10 +8,17 @@ import { NextResponse } from "next/server";
 export async function middleware(request) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
+  let supabase;
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn("Middleware: Missing Supabase Environment Variables!");
+      return supabaseResponse; // Let it pass if env vars are missing so we don't crash the whole site
+    }
+
+    supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -26,18 +33,23 @@ export async function middleware(request) {
           );
         },
       },
-    }
-  );
+    });
+  } catch (error) {
+    console.error("Middleware initialization error:", error);
+    return supabaseResponse;
+  }
 
   // Refresh session — IMPORTANT: do not remove this call
   let user = null;
-  try {
-    // Using getSession() instead of getUser() avoids a network fetch in Edge runtime,
-    // bypassing the local Windows 'failed to fetch' timeout issue.
-    const { data: { session } } = await supabase.auth.getSession();
-    user = session?.user ?? null;
-  } catch (error) {
-    console.error("Middleware Supabase Error:", error);
+  if (supabase) {
+    try {
+      // Using getSession() instead of getUser() avoids a network fetch in Edge runtime,
+      // bypassing the local Windows 'failed to fetch' timeout issue.
+      const { data: { session } } = await supabase.auth.getSession();
+      user = session?.user ?? null;
+    } catch (error) {
+      console.error("Middleware Supabase Error:", error);
+    }
   }
 
   const { pathname } = request.nextUrl;
