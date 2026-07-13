@@ -15,11 +15,12 @@ import {
   BarChart2,
   Loader2,
   RefreshCw,
+  Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@/lib/context/UserContext";
 import { useToast } from "@/lib/context/ToastContext";
-import { getResumes, deleteResume } from "@/lib/services/resumeService";
+import { getResumes, deleteResume, getCareerReports, deleteCareerReport } from "@/lib/services/resumeService";
 import { formatDate, getScoreColor, getScoreBgColor, getScoreLabel } from "@/lib/utils";
 
 const sortOptions = ["Newest First", "Oldest First", "Highest Score", "Lowest Score"];
@@ -28,7 +29,9 @@ export default function HistoryPage() {
   const { user } = useUser();
   const { showToast } = useToast();
 
+  const [activeTab, setActiveTab] = useState("resumes"); // 'resumes' or 'market'
   const [resumes, setResumes] = useState([]);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("Newest First");
@@ -39,21 +42,27 @@ export default function HistoryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Fetch live resume history
+  // Fetch live history
   useEffect(() => {
     if (!user) return;
-    getResumes(user.id).then(({ resumes: data, error }) => {
-      if (error) {
+    setLoading(true);
+    
+    Promise.all([
+      getResumes(user.id),
+      getCareerReports(user.id)
+    ]).then(([resumesData, reportsData]) => {
+      if (resumesData.error || reportsData.error) {
         showToast("Failed to load history.", "error");
       } else {
-        setResumes(data);
+        setResumes(resumesData.resumes);
+        setReports(reportsData.reports);
       }
       setLoading(false);
     });
   }, [user, showToast]);
 
-  // Filter + sort
-  const filtered = resumes
+  // Filter + sort for Resumes
+  const filteredResumes = resumes
     .filter((h) =>
       h.file_name.toLowerCase().includes(search.toLowerCase()) ||
       (h.job_title ?? "").toLowerCase().includes(search.toLowerCase()) ||
@@ -67,20 +76,37 @@ export default function HistoryPage() {
       return 0;
     });
 
-  // Reset pagination when filter/sort changes
+  // Filter + sort for Market Reports
+  const filteredReports = reports
+    .filter((h) =>
+      h.job_title.toLowerCase().includes(search.toLowerCase()) ||
+      (h.location ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (h.resumes?.file_name ?? "").toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sort === "Newest First") return new Date(b.created_at) - new Date(a.created_at);
+      if (sort === "Oldest First") return new Date(a.created_at) - new Date(b.created_at);
+      const scoreA = a.ai_report?.marketReadinessScore ?? 0;
+      const scoreB = b.ai_report?.marketReadinessScore ?? 0;
+      if (sort === "Highest Score") return scoreB - scoreA;
+      if (sort === "Lowest Score") return scoreA - scoreB;
+      return 0;
+    });
+
+  const currentData = activeTab === "resumes" ? filteredResumes : filteredReports;
+
+  // Reset pagination when filter/sort/tab changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, sort]);
+  }, [search, sort, activeTab]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginatedData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(currentData.length / itemsPerPage);
+  const paginatedData = currentData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const handleDelete = async (resume) => {
-    if (!confirm(`Delete "${resume.file_name}"? This cannot be undone.`)) return;
-
+  const handleDeleteResume = async (resume) => {
+    if (!confirm(`Delete resume "${resume.file_name}"? This cannot be undone.`)) return;
     setDeletingId(resume.id);
     const { error } = await deleteResume(resume.id, resume.file_path);
-
     if (error) {
       showToast("Failed to delete resume: " + error, "error");
     } else {
@@ -90,17 +116,30 @@ export default function HistoryPage() {
     setDeletingId(null);
   };
 
+  const handleDeleteReport = async (report) => {
+    if (!confirm(`Delete market report for "${report.job_title}"? This cannot be undone.`)) return;
+    setDeletingId(report.id);
+    const { error } = await deleteCareerReport(report.id);
+    if (error) {
+      showToast("Failed to delete report: " + error, "error");
+    } else {
+      setReports((prev) => prev.filter((r) => r.id !== report.id));
+      showToast("Report deleted.", "success");
+    }
+    setDeletingId(null);
+  };
+
   // Computed stats from live data
-  const scores = resumes.filter((r) => r.overall_score != null).map((r) => r.overall_score);
-  const bestScore = scores.length ? Math.max(...scores) : 0;
-  const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const resumeScores = resumes.filter((r) => r.overall_score != null).map((r) => r.overall_score);
+  const bestScore = resumeScores.length ? Math.max(...resumeScores) : 0;
+  const avgScore = resumeScores.length ? Math.round(resumeScores.reduce((a, b) => a + b, 0) / resumeScores.length) : 0;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="font-heading text-2xl font-bold mb-1">Analysis History</h1>
-        <p className="text-secondary-text">Track your resume improvement over time</p>
+        <p className="text-secondary-text">Track your resume improvements and market intelligence over time</p>
       </motion.div>
 
       {/* Summary Stats */}
@@ -112,8 +151,8 @@ export default function HistoryPage() {
       >
         {[
           { label: "Total Uploads", value: loading ? "—" : resumes.length, icon: BarChart2, color: "text-blue-400 bg-blue-500/10" },
-          { label: "Best Score", value: loading ? "—" : (bestScore || "—"), icon: TrendingUp, color: "text-green-400 bg-green-500/10" },
-          { label: "Avg Score", value: loading ? "—" : (avgScore || "—"), icon: Target, color: "text-amber-400 bg-amber-500/10" },
+          { label: "Best Resume Score", value: loading ? "—" : (bestScore || "—"), icon: TrendingUp, color: "text-green-400 bg-green-500/10" },
+          { label: "Avg Resume Score", value: loading ? "—" : (avgScore || "—"), icon: Target, color: "text-amber-400 bg-amber-500/10" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-card border border-border rounded-card p-5 flex items-center gap-4">
             <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center`}>
@@ -126,6 +165,28 @@ export default function HistoryPage() {
           </div>
         ))}
       </motion.div>
+
+      {/* Tabs */}
+      <div className="flex space-x-2 border-b border-border mb-4">
+        <button
+          onClick={() => setActiveTab("resumes")}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === "resumes" ? "border-primary text-primary" : "border-transparent text-secondary-text hover:text-primary-text"
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Resume Analyses
+        </button>
+        <button
+          onClick={() => setActiveTab("market")}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === "market" ? "border-primary text-primary" : "border-transparent text-secondary-text hover:text-primary-text"
+          }`}
+        >
+          <Briefcase className="w-4 h-4" />
+          Market Intelligence
+        </button>
+      </div>
 
       {/* Search + Filter Bar */}
       <motion.div
@@ -140,7 +201,7 @@ export default function HistoryPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by company, role, or filename..."
+            placeholder="Search..."
             className="input-base w-full pl-10"
           />
         </div>
@@ -187,25 +248,27 @@ export default function HistoryPage() {
             </div>
           ))
         ) : (
-          <AnimatePresence>
-            {filtered.length === 0 ? (
+          <AnimatePresence mode="wait">
+            {currentData.length === 0 ? (
               <motion.div
+                key="empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="text-center py-20"
               >
                 <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center mx-auto mb-4">
-                  <FileText className="w-8 h-8 text-muted" />
+                  {activeTab === "resumes" ? <FileText className="w-8 h-8 text-muted" /> : <Briefcase className="w-8 h-8 text-muted" />}
                 </div>
-                <h3 className="font-semibold text-lg mb-1">No analyses found</h3>
+                <h3 className="font-semibold text-lg mb-1">No {activeTab === "resumes" ? "analyses" : "reports"} found</h3>
                 <p className="text-secondary-text text-sm mb-6">
-                  {search ? "Try adjusting your search" : "Upload your first resume to get started"}
+                  {search ? "Try adjusting your search" : `Generate your first ${activeTab === "resumes" ? "resume analysis" : "market report"} to get started`}
                 </p>
                 <Link
-                  href="/dashboard/upload"
+                  href={activeTab === "resumes" ? "/dashboard/upload" : "/dashboard/market"}
                   className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-6 py-2.5 rounded-button hover:bg-accent transition-all hover:shadow-glow-sm text-sm"
                 >
-                  Upload Resume
+                  {activeTab === "resumes" ? "Upload Resume" : "Generate Report"}
                 </Link>
               </motion.div>
             ) : (
@@ -219,56 +282,59 @@ export default function HistoryPage() {
                   layout
                   className="bg-card border border-border rounded-card p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/20 transition-all duration-200 group"
                 >
-                  {/* File Icon */}
+                  {/* Icon */}
                   <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-6 h-6 text-primary" />
+                    {activeTab === "resumes" ? (
+                      <FileText className="w-6 h-6 text-primary" />
+                    ) : (
+                      <Briefcase className="w-6 h-6 text-primary" />
+                    )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-primary-text">
-                        {item.job_title || item.file_name}
+                        {activeTab === "resumes" ? (item.job_title || item.file_name) : item.job_title}
                       </h3>
-                      {item.overall_score != null && (
+                      {activeTab === "resumes" && item.overall_score != null && (
                         <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${getScoreBgColor(item.overall_score)}`}>
                           {getScoreLabel(item.overall_score)}
                         </span>
                       )}
-                      {item.status === "uploaded" && !item.overall_score && (
-                        <span className="text-xs px-2.5 py-1 rounded-full border font-medium border-amber-200 bg-amber-50 text-amber-700">
-                          Pending Analysis
+                      {activeTab === "market" && item.ai_report?.marketReadinessScore != null && (
+                        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${item.ai_report.marketReadinessScore >= 75 ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                          {item.ai_report.marketReadinessScore >= 75 ? 'High Readiness' : 'Needs Improvement'}
                         </span>
                       )}
                     </div>
                     <p className="text-secondary-text text-sm mt-0.5">
-                      {item.company ? `${item.company} · ` : ""}{item.file_name}
+                      {activeTab === "resumes" 
+                        ? `${item.company ? `${item.company} · ` : ""}${item.file_name}`
+                        : `${item.location ? `${item.location} · ` : ""}Resume: ${item.resumes?.file_name || "Unknown"}`
+                      }
                     </p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {formatDate(item.uploaded_at)}
+                        {formatDate(activeTab === "resumes" ? item.uploaded_at : item.created_at)}
                       </span>
-                      {item.ats_score != null && (
-                        <span className="flex items-center gap-1">
-                          <Target className="w-3 h-3" />
-                          ATS: {item.ats_score}
-                        </span>
-                      )}
-                      {item.job_match != null && (
-                        <span className="flex items-center gap-1">
-                          <BarChart2 className="w-3 h-3" />
-                          Match: {item.job_match}%
-                        </span>
-                      )}
                     </div>
                   </div>
 
                   {/* Score */}
-                  {item.overall_score != null && (
+                  {activeTab === "resumes" && item.overall_score != null && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <span className={`font-heading text-3xl font-bold ${getScoreColor(item.overall_score)}`}>
                         {item.overall_score}
+                      </span>
+                      <span className="text-muted text-sm">/100</span>
+                    </div>
+                  )}
+                  {activeTab === "market" && item.ai_report?.marketReadinessScore != null && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className={`font-heading text-3xl font-bold ${item.ai_report.marketReadinessScore >= 75 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                        {item.ai_report.marketReadinessScore}
                       </span>
                       <span className="text-muted text-sm">/100</span>
                     </div>
@@ -277,21 +343,14 @@ export default function HistoryPage() {
                   {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
-                      href={`/dashboard/analysis/${item.id}`}
+                      href={activeTab === "resumes" ? `/dashboard/analysis/${item.id}` : `/dashboard/market/${item.id}`}
                       className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-button bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all duration-200"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       View
                     </Link>
-                    <Link
-                      href={`/dashboard/loading-analysis?resumeId=${item.id}&force=true`}
-                      className="w-9 h-9 rounded-button bg-surface border border-border hover:border-primary hover:bg-primary/10 text-muted hover:text-primary flex items-center justify-center transition-all duration-200"
-                      aria-label="Re-analyze"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </Link>
                     <button
-                      onClick={() => handleDelete(item)}
+                      onClick={() => activeTab === "resumes" ? handleDeleteResume(item) : handleDeleteReport(item)}
                       disabled={deletingId === item.id}
                       className="w-9 h-9 rounded-button bg-surface border border-border hover:border-danger hover:bg-danger/10 text-muted hover:text-danger flex items-center justify-center transition-all duration-200 disabled:opacity-40"
                       aria-label="Delete"

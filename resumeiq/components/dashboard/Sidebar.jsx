@@ -16,6 +16,7 @@ import {
   LogOut,
   X,
   Bell,
+  Briefcase,
 } from "lucide-react";
 import { mockUser } from "@/lib/mock-data";
 import { useUser } from "@/lib/context/UserContext";
@@ -25,6 +26,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Upload, label: "Upload & Analyze", href: "/dashboard/upload" },
   { icon: History, label: "History", href: "/dashboard/history" },
+  { icon: Briefcase, label: "Market Intelligence", href: "/dashboard/market" },
   { icon: TrendingUp, label: "Analysis", href: "/dashboard/analysis/analysis-001" },
   { icon: User, label: "Profile", href: "/dashboard/profile" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },

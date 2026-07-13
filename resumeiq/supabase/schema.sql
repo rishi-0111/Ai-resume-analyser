@@ -198,5 +198,47 @@ CREATE POLICY "Users can delete their own resumes"
 
 
 -- ─────────────────────────────────────────────────────
+-- 8. Create the career_reports table (Market Intelligence)
+-- ─────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.career_reports (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  resume_id       UUID NOT NULL REFERENCES public.resumes(id) ON DELETE CASCADE,
+  job_title       TEXT NOT NULL,
+  location        TEXT DEFAULT '',
+  job_description TEXT DEFAULT '',
+  market_data     JSONB,
+  ai_report       JSONB,
+  status          TEXT DEFAULT 'processing',
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS on career_reports
+ALTER TABLE public.career_reports ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own career reports"   ON public.career_reports;
+DROP POLICY IF EXISTS "Users can insert their own career reports" ON public.career_reports;
+DROP POLICY IF EXISTS "Users can update their own career reports" ON public.career_reports;
+DROP POLICY IF EXISTS "Users can delete their own career reports" ON public.career_reports;
+
+CREATE POLICY "Users can view their own career reports"
+  ON public.career_reports FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own career reports"
+  ON public.career_reports FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own career reports"
+  ON public.career_reports FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own career reports"
+  ON public.career_reports FOR DELETE
+  USING (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────
 -- Done! Migration complete.
 -- ─────────────────────────────────────────────────────

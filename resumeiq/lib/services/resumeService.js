@@ -208,3 +208,28 @@ export async function getResumeById(resumeId) {
 
   return { resume: data, error: error?.message || null };
 }
+
+/**
+ * Fetch all Market Intelligence reports for a user.
+ */
+export async function getCareerReports(userId) {
+  const { data, error } = await supabase
+    .from("career_reports")
+    .select("*, resumes(file_name)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  return { reports: data ?? [], error };
+}
+
+/**
+ * Delete a Market Intelligence report from DB.
+ */
+export async function deleteCareerReport(reportId) {
+  const { error } = await supabase
+    .from("career_reports")
+    .delete()
+    .eq("id", reportId);
+
+  return { error: error?.message ?? null };
+}
