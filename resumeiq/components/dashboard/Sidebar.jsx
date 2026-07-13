@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Zap,
   LayoutDashboard,
   Upload,
   History,
@@ -19,6 +18,8 @@ import {
   Bell,
 } from "lucide-react";
 import { mockUser } from "@/lib/mock-data";
+import { useUser } from "@/lib/context/UserContext";
+import { supabase } from "@/lib/supabase/client";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -75,6 +76,20 @@ function NavItem({ item, collapsed, active, onClick }) {
 export function DesktopSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { user } = useUser();
+
+  const userName = user?.user_metadata?.full_name || mockUser.name;
+  const userInitials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
 
   return (
     <motion.aside
@@ -84,9 +99,7 @@ export function DesktopSidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 p-4 h-16 border-b border-border flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-glow-sm">
-          <Zap className="w-4 h-4 text-white" />
-        </div>
+        <img src="/logo.png" alt="ResumeIQ Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm" />
         <AnimatePresence>
           {!collapsed && (
             <motion.span
@@ -123,7 +136,7 @@ export function DesktopSidebar() {
         {/* User */}
         <div className={`flex items-center gap-3 px-2 py-2 ${collapsed ? "justify-center" : ""}`}>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-            AJ
+            {userInitials}
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -134,7 +147,7 @@ export function DesktopSidebar() {
                 className="overflow-hidden"
               >
                 <p className="text-sm font-medium text-primary-text whitespace-nowrap">
-                  {mockUser.name}
+                  {userName}
                 </p>
                 <p className="text-xs text-muted whitespace-nowrap">{mockUser.plan} Plan</p>
               </motion.div>
@@ -164,6 +177,21 @@ export function DesktopSidebar() {
 // Mobile Drawer
 export function MobileDrawer({ open, onClose }) {
   const pathname = usePathname();
+  const { user } = useUser();
+
+  const userName = user?.user_metadata?.full_name || mockUser.name;
+  const userEmail = user?.email || mockUser.email;
+  const userInitials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
 
   return (
     <AnimatePresence>
@@ -186,9 +214,7 @@ export function MobileDrawer({ open, onClose }) {
             {/* Header */}
             <div className="flex items-center justify-between p-4 h-16 border-b border-border">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
-                </div>
+                <img src="/logo.png" alt="ResumeIQ Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm" />
                 <span className="font-heading font-bold text-lg">
                   Resume<span className="gradient-text">IQ</span>
                 </span>
@@ -222,14 +248,17 @@ export function MobileDrawer({ open, onClose }) {
             <div className="p-4 border-t border-border">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-white">
-                  AJ
+                  {userInitials}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{mockUser.name}</p>
-                  <p className="text-xs text-muted">{mockUser.email}</p>
+                  <p className="text-sm font-medium">{userName}</p>
+                  <p className="text-xs text-muted">{userEmail}</p>
                 </div>
               </div>
-              <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-all text-sm">
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-all text-sm"
+              >
                 <LogOut className="w-4 h-4" />
                 Sign Out
               </button>

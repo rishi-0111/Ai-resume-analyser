@@ -3,19 +3,60 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Zap, Mail, Lock, ArrowRight, Globe2 } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Globe2, X } from "lucide-react";
+import { signIn, signInWithGoogle, sendPasswordReset } from "@/lib/services/authService";
+import { useToast } from "@/lib/context/ToastContext";
 
 export default function LoginPage() {
+  const { showToast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ email: "", password: "", remember: false });
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      window.location.href = "/dashboard";
-    }, 1500);
+    setError("");
+
+    const { error: authError } = await signIn(form.email, form.password);
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    showToast("Welcome back!", "success");
+    window.location.href = "/dashboard";
+  };
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      showToast(error.message, "error");
+      setGoogleLoading(false);
+    }
+    // On success, Supabase redirects automatically
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    const { error } = await sendPasswordReset(forgotEmail);
+    setForgotLoading(false);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Password reset email sent! Check your inbox.", "success");
+      setShowForgot(false);
+      setForgotEmail("");
+    }
   };
 
   return (
@@ -36,9 +77,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-center p-16 space-y-10">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-glow-sm">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="ResumeIQ Logo" className="w-9 h-9 object-contain rounded-xl shadow-sm" />
             <span className="font-heading font-bold text-2xl">
               Resume<span className="gradient-text">IQ</span>
             </span>
@@ -82,9 +121,7 @@ export default function LoginPage() {
         >
           {/* Mobile Logo */}
           <Link href="/" className="flex items-center gap-2 mb-10 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
+            <img src="/logo.png" alt="ResumeIQ Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm" />
             <span className="font-heading font-bold text-xl">
               Resume<span className="gradient-text">IQ</span>
             </span>
@@ -104,8 +141,17 @@ export default function LoginPage() {
           </div>
 
           {/* Google SSO */}
-          <button className="w-full flex items-center justify-center gap-3 bg-surface border border-border hover:border-primary/40 text-primary-text font-semibold py-3.5 px-6 rounded-button transition-all duration-200 mb-6 group">
-            <Globe2 className="w-5 h-5 text-secondary-text group-hover:text-primary-text" />
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 bg-surface border border-border hover:border-primary/40 text-primary-text font-semibold py-3.5 px-6 rounded-button transition-all duration-200 mb-6 group disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {googleLoading ? (
+              <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            ) : (
+              <Globe2 className="w-5 h-5 text-secondary-text group-hover:text-primary-text" />
+            )}
             Continue with Google
           </button>
 
@@ -118,6 +164,11 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-3 bg-danger/10 border border-danger/20 text-danger text-sm rounded-button text-center">
+                {error}
+              </div>
+            )}
             {/* Email */}
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-secondary-text block">
@@ -139,14 +190,18 @@ export default function LoginPage() {
 
             {/* Password */}
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label htmlFor="password" className="text-sm font-medium text-secondary-text block">
-                  Password
-                </label>
-                <a href="#" className="text-xs text-primary hover:text-accent transition-colors">
-                  Forgot password?
-                </a>
-              </div>
+                <div className="flex justify-between items-center">
+                  <label htmlFor="password" className="text-sm font-medium text-secondary-text block">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot(true)}
+                    className="text-xs text-primary hover:text-accent transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                 <input
@@ -211,6 +266,49 @@ export default function LoginPage() {
           </p>
         </motion.div>
       </div>
+
+      {/* ── Forgot Password Modal ── */}
+      {showForgot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-border rounded-card p-8 max-w-sm w-full mx-4 shadow-premium"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-heading font-bold text-lg">Reset Password</h3>
+              <button onClick={() => setShowForgot(false)} className="text-muted hover:text-primary-text transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-secondary-text text-sm mb-6">
+              Enter your email and we&apos;ll send you a link to reset your password.
+            </p>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                <input
+                  type="email"
+                  required
+                  placeholder="you@company.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="input-base w-full pl-11"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-accent text-white font-semibold py-3 px-6 rounded-button transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {forgotLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : "Send Reset Link"}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

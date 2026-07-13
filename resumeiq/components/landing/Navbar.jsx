@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu,
   X,
-  Zap,
   ChevronRight,
 } from "lucide-react";
 
@@ -43,9 +42,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16 md:h-18">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-glow-sm group-hover:shadow-glow transition-all duration-300">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
+              <img src="/logo.png" alt="ResumeIQ Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm" />
               <span className="font-heading font-bold text-xl text-primary-text">
                 Resume<span className="gradient-text">IQ</span>
               </span>
@@ -114,9 +111,7 @@ export default function Navbar() {
             >
               <div className="flex items-center justify-between p-5 border-b border-border">
                 <Link href="/" className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                    <Zap className="w-3.5 h-3.5 text-white" />
-                  </div>
+                  <img src="/logo.png" alt="ResumeIQ Logo" className="w-7 h-7 object-contain rounded-lg shadow-sm" />
                   <span className="font-heading font-bold text-lg">
                     Resume<span className="gradient-text">IQ</span>
                   </span>

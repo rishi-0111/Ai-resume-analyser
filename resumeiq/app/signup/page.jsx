@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import {
   Eye,
   EyeOff,
-  Zap,
   Mail,
   Lock,
   User,
@@ -14,6 +13,9 @@ import {
   Globe2,
   Check,
 } from "lucide-react";
+import { signUp, signInWithGoogle } from "@/lib/services/authService";
+import { upsertProfile } from "@/lib/services/profileService";
+import { useToast } from "@/lib/context/ToastContext";
 
 const passwordChecks = [
   { label: "At least 8 characters", test: (p) => p.length >= 8 },
@@ -22,9 +24,12 @@ const passwordChecks = [
 ];
 
 export default function SignupPage() {
+  const { showToast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -32,12 +37,41 @@ export default function SignupPage() {
     confirm: "",
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      window.location.href = "/dashboard";
-    }, 1500);
+    setError("");
+
+    if (form.password !== form.confirm) {
+      setError("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
+    const { data, error: authError } = await signUp(form.email, form.password, form.name);
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Create profile record immediately after signup
+    if (data?.user) {
+      await upsertProfile(data.user.id, { full_name: form.name });
+    }
+
+    showToast("Account created! Welcome to ResumeIQ.", "success");
+    window.location.href = "/dashboard";
+  };
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      showToast(error.message, "error");
+      setGoogleLoading(false);
+    }
   };
 
   const allChecks = passwordChecks.every((c) => c.test(form.password));
@@ -54,9 +88,7 @@ export default function SignupPage() {
         >
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 mb-10 justify-center">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-glow-sm">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="ResumeIQ Logo" className="w-9 h-9 object-contain rounded-xl shadow-sm" />
             <span className="font-heading font-bold text-2xl">
               Resume<span className="gradient-text">IQ</span>
             </span>
@@ -80,8 +112,17 @@ export default function SignupPage() {
             </div>
 
             {/* Google SSO */}
-            <button className="w-full flex items-center justify-center gap-3 bg-surface border border-border hover:border-primary/40 text-primary-text font-semibold py-3.5 px-6 rounded-button transition-all duration-200 mb-6 group">
-              <Globe2 className="w-5 h-5 text-secondary-text group-hover:text-primary-text" />
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={googleLoading}
+              className="w-full flex items-center justify-center gap-3 bg-surface border border-border hover:border-primary/40 text-primary-text font-semibold py-3.5 px-6 rounded-button transition-all duration-200 mb-6 group disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {googleLoading ? (
+                <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              ) : (
+                <Globe2 className="w-5 h-5 text-secondary-text group-hover:text-primary-text" />
+              )}
               Continue with Google
             </button>
 
@@ -94,6 +135,11 @@ export default function SignupPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-danger/10 border border-danger/20 text-danger text-sm rounded-button text-center">
+                  {error}
+                </div>
+              )}
               {/* Name */}
               <div className="space-y-1.5">
                 <label

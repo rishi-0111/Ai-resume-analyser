@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { mockUser } from "@/lib/mock-data";
+import { useUser } from "@/lib/context/UserContext";
+import { supabase } from "@/lib/supabase/client";
 
 const notifications = [
   { id: 1, text: "Your resume score improved by 14 points!", time: "2h ago", unread: true },
@@ -24,6 +26,21 @@ const notifications = [
 export default function TopNavbar({ onMenuClick }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const { user } = useUser();
+
+  const userName = user?.user_metadata?.full_name || mockUser.name;
+  const userEmail = user?.email || mockUser.email;
+  const userInitials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   return (
@@ -134,7 +151,7 @@ export default function TopNavbar({ onMenuClick }) {
             className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-card transition-all"
           >
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xs font-bold text-white">
-              AJ
+              {userInitials}
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-muted transition-transform ${userOpen ? "rotate-180" : ""}`} />
           </button>
@@ -147,8 +164,8 @@ export default function TopNavbar({ onMenuClick }) {
               className="absolute right-0 top-12 w-56 bg-card border border-border rounded-card shadow-premium z-50"
             >
               <div className="px-4 py-3 border-b border-border">
-                <p className="font-semibold text-sm">{mockUser.name}</p>
-                <p className="text-xs text-muted">{mockUser.email}</p>
+                <p className="font-semibold text-sm">{userName}</p>
+                <p className="text-xs text-muted">{userEmail}</p>
                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full mt-1 inline-block">
                   {mockUser.plan} Plan
                 </span>
@@ -172,13 +189,13 @@ export default function TopNavbar({ onMenuClick }) {
                 </Link>
               </div>
               <div className="p-2 border-t border-border">
-                <Link
-                  href="/"
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted hover:text-danger hover:bg-danger/10 transition-all"
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted hover:text-danger hover:bg-danger/10 transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign Out
-                </Link>
+                </button>
               </div>
             </motion.div>
           )}

@@ -11,20 +11,46 @@ import {
   AlertCircle,
   Paperclip,
   Clock,
-  Eye,
-  Trash2,
   ChevronRight,
 } from "lucide-react";
-import { mockHistory } from "@/lib/mock-data";
 import { formatRelativeTime, getScoreColor } from "@/lib/utils";
+import { useUser } from "@/lib/context/UserContext";
+import { useToast } from "@/lib/context/ToastContext";
+import { uploadResume, validateResumeFile, getResumes } from "@/lib/services/resumeService";
+import { useEffect } from "react";
 
 export default function UploadPage() {
   const router = useRouter();
+  const { user } = useUser();
+  const { showToast } = useToast();
+
   const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
-  const [analyzing, setAnalyzing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
+  const [recentUploads, setRecentUploads] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Fetch real recent uploads for the sidebar
+  useEffect(() => {
+    if (!user) return;
+    getResumes(user.id).then(({ resumes }) => {
+      setRecentUploads(resumes.slice(0, 4));
+      setLoadingHistory(false);
+    });
+  }, [user]);
+
+  const validateAndSetFile = (f) => {
+    const { valid, error: validErr } = validateResumeFile(f);
+    if (!valid) {
+      setError(validErr);
+      return;
+    }
+    setError("");
+    setFile(f);
+  };
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -38,32 +64,43 @@ export default function UploadPage() {
     if (f) validateAndSetFile(f);
   };
 
-  const validateAndSetFile = (f) => {
-    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    if (!allowed.includes(f.type)) {
-      setError("Only PDF and DOCX files are supported.");
-      return;
-    }
-    if (f.size > 10 * 1024 * 1024) {
-      setError("File size must be under 10MB.");
-      return;
-    }
-    setError("");
-    setFile(f);
-  };
-
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!file) {
       setError("Please upload a resume first.");
       return;
     }
-    setAnalyzing(true);
-    router.push("/dashboard/loading-analysis");
+    if (!user) {
+      showToast("Please sign in to upload a resume.", "error");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    const { resume, error: uploadError } = await uploadResume(
+      user.id,
+      file,
+      { jobDescription },
+      (progress) => setUploadProgress(progress)
+    );
+
+    if (uploadError) {
+      setError(uploadError);
+      showToast(uploadError, "error");
+      setUploading(false);
+      setUploadProgress(0);
+      return;
+    }
+
+    showToast("Resume uploaded successfully!", "success");
+    // Navigate to the analysis loading screen, passing resume id
+    router.push(`/dashboard/loading-analysis?resumeId=${resume.id}`);
   };
 
   const removeFile = () => {
     setFile(null);
     setError("");
+    setUploadProgress(0);
   };
 
   return (
@@ -74,7 +111,7 @@ export default function UploadPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="font-heading text-2xl font-bold mb-1">Upload & Analyze</h1>
+        <h1 className="font-heading text-2xl font-bold mb-1">Upload &amp; Analyze</h1>
         <p className="text-secondary-text">
           Upload your resume to get an instant AI-powered analysis with ATS
           score, skill gaps, and improvement suggestions.
@@ -102,7 +139,6 @@ export default function UploadPage() {
                 : "border-border bg-card hover:border-primary/40"
             }`}
           >
-            {/* Animated border glow on hover */}
             {dragOver && (
               <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 animate-pulse" />
             )}
@@ -127,16 +163,34 @@ export default function UploadPage() {
                           File Ready
                         </span>
                       </div>
-                      <p className="font-semibold text-primary-text">
-                        {file.name}
-                      </p>
+                      <p className="font-semibold text-primary-text">{file.name}</p>
                       <p className="text-sm text-muted mt-1">
                         {(file.size / 1024).toFixed(1)} KB
                       </p>
                     </div>
+
+                    {/* Upload progress bar */}
+                    {uploading && (
+                      <div className="w-full max-w-xs mx-auto">
+                        <div className="flex justify-between text-xs text-muted mb-1">
+                          <span>Uploading...</span>
+                          <span>{uploadProgress}%</span>
+                        </div>
+                        <div className="h-2 bg-border rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-primary rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${uploadProgress}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       onClick={removeFile}
-                      className="flex items-center gap-2 mx-auto text-sm text-muted hover:text-danger transition-colors px-4 py-2 rounded-lg hover:bg-danger/10"
+                      disabled={uploading}
+                      className="flex items-center gap-2 mx-auto text-sm text-muted hover:text-danger transition-colors px-4 py-2 rounded-lg hover:bg-danger/10 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <X className="w-4 h-4" />
                       Remove file
@@ -232,15 +286,15 @@ export default function UploadPage() {
           {/* Analyze Button */}
           <motion.button
             onClick={handleAnalyze}
-            disabled={!file || analyzing}
+            disabled={!file || uploading}
             whileHover={{ scale: file ? 1.02 : 1 }}
             whileTap={{ scale: file ? 0.98 : 1 }}
             className="w-full flex items-center justify-center gap-3 bg-primary hover:bg-accent text-white font-bold py-4 px-8 rounded-button transition-all duration-200 hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed text-base"
           >
-            {analyzing ? (
+            {uploading ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Starting Analysis...
+                Uploading Resume...
               </>
             ) : (
               <>
@@ -279,34 +333,50 @@ export default function UploadPage() {
             </ul>
           </div>
 
-          {/* Recent Uploads */}
+          {/* Recent Uploads — Live from Supabase */}
           <div className="bg-card border border-border rounded-card p-5">
             <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
               <Clock className="w-4 h-4 text-muted" />
               Recent Uploads
             </h3>
             <div className="space-y-3">
-              {mockHistory.slice(0, 4).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-4 h-4 text-primary" />
+              {loadingHistory ? (
+                // Skeleton loader
+                [...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 animate-pulse">
+                    <div className="w-8 h-8 rounded-lg bg-border flex-shrink-0" />
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 bg-border rounded w-3/4" />
+                      <div className="h-2 bg-border rounded w-1/2" />
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-primary-text truncate">
-                      {item.jobTitle}
-                    </p>
-                    <p className="text-[10px] text-muted">
-                      {formatRelativeTime(item.uploadedAt)}
-                    </p>
+                ))
+              ) : recentUploads.length === 0 ? (
+                <p className="text-xs text-muted text-center py-4">
+                  No uploads yet. Upload your first resume!
+                </p>
+              ) : (
+                recentUploads.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 group">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-primary-text truncate">
+                        {item.file_name}
+                      </p>
+                      <p className="text-[10px] text-muted">
+                        {formatRelativeTime(item.uploaded_at)}
+                      </p>
+                    </div>
+                    {item.overall_score != null && (
+                      <span className={`text-xs font-bold ${getScoreColor(item.overall_score)}`}>
+                        {item.overall_score}
+                      </span>
+                    )}
                   </div>
-                  <span className={`text-xs font-bold ${getScoreColor(item.overallScore)}`}>
-                    {item.overallScore}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </motion.div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Camera,
@@ -17,10 +17,13 @@ import {
   Star,
   Zap,
   BarChart2,
-  Calendar,
+  Loader2,
 } from "lucide-react";
-import { mockUser, mockActivity, mockHistory, achievements } from "@/lib/mock-data";
-import { formatRelativeTime, getScoreColor } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
+import { useUser } from "@/lib/context/UserContext";
+import { useToast } from "@/lib/context/ToastContext";
+import { getProfile, updateProfile, upsertProfile } from "@/lib/services/profileService";
+import { getResumeStats } from "@/lib/services/resumeService";
 
 const iconMap = { Upload, TrendingUp, Target, BarChart2: BarChart2, Zap };
 
@@ -34,20 +37,70 @@ const itemVariants = {
 };
 
 export default function ProfilePage() {
-  const [editing, setEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    name: mockUser.name,
-    email: mockUser.email,
-    role: mockUser.role,
-    location: mockUser.location,
-  });
-  const [saved, setSaved] = useState(false);
+  const { user } = useUser();
+  const { showToast } = useToast();
 
-  const handleSave = () => {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [resumeStats, setResumeStats] = useState(null);
+
+  const [profile, setProfile] = useState({
+    name: "",
+    email: "",
+    role: "",
+    location: "",
+    plan: "Free",
+  });
+
+  // Load profile + resume stats on mount
+  useEffect(() => {
+    if (!user) return;
+
+    async function load() {
+      setLoadingProfile(true);
+      // Ensure profile row exists
+      const { profile: dbProfile } = await getProfile(user.id);
+      setProfile({
+        name: dbProfile?.full_name || user.user_metadata?.full_name || "",
+        email: user.email ?? "",
+        role: dbProfile?.role ?? "",
+        location: dbProfile?.location ?? "",
+        plan: dbProfile?.plan ?? "Free",
+      });
+      setLoadingProfile(false);
+
+      // Also fetch resume stats for sidebar widgets
+      const { stats } = await getResumeStats(user.id);
+      setResumeStats(stats);
+    }
+
+    load();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+
+    const { error } = await updateProfile(user.id, {
+      full_name: profile.name,
+      role: profile.role,
+      location: profile.location,
+    });
+
+    setSaving(false);
     setEditing(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+
+    if (error) {
+      showToast("Failed to save profile: " + error.message, "error");
+    } else {
+      setSaved(true);
+      showToast("Profile saved successfully!", "success");
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
+
 
   return (
     <motion.div
@@ -141,10 +194,15 @@ export default function ProfilePage() {
               {editing ? (
                 <button
                   onClick={handleSave}
-                  className="flex items-center gap-2 bg-primary hover:bg-accent text-white font-semibold px-5 py-2.5 rounded-button transition-all text-sm hover:shadow-glow-sm"
+                  disabled={saving}
+                  className="flex items-center gap-2 bg-primary hover:bg-accent text-white font-semibold px-5 py-2.5 rounded-button transition-all text-sm hover:shadow-glow-sm disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <CheckCircle className="w-4 h-4" />
-                  Save Changes
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
               ) : (
                 <button
@@ -156,20 +214,19 @@ export default function ProfilePage() {
                 </button>
               )}
               <span className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full border border-primary/20 font-medium">
-                {mockUser.plan} Plan
+                {profile.plan} Plan
               </span>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid — Live Data */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Resumes Analyzed", value: mockUser.stats.resumesAnalyzed, icon: FileText, color: "text-blue-400 bg-blue-500/10" },
-          { label: "Average Score", value: mockUser.stats.avgScore, icon: Star, color: "text-amber-400 bg-amber-500/10" },
-          { label: "Jobs Applied", value: mockUser.stats.jobsApplied, icon: Briefcase, color: "text-green-400 bg-green-500/10" },
-          { label: "Interviews Landed", value: mockUser.stats.interviewsLanded, icon: TrendingUp, color: "text-purple-400 bg-purple-500/10" },
+          { label: "Total Uploads", value: resumeStats?.total ?? "—", icon: FileText, color: "text-blue-400 bg-blue-500/10" },
+          { label: "Best ATS Score", value: resumeStats?.bestAts ?? "—", icon: TrendingUp, color: "text-green-400 bg-green-500/10" },
+          { label: "Latest ATS", value: resumeStats?.latestAts ?? "—", icon: Target, color: "text-purple-400 bg-purple-500/10" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-card border border-border rounded-card p-5 text-center">
             <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mx-auto mb-3`}>
@@ -185,33 +242,37 @@ export default function ProfilePage() {
         {/* Recent Activity */}
         <motion.div variants={itemVariants} className="bg-card border border-border rounded-card p-6">
           <h2 className="font-heading font-semibold mb-6 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-primary" />
+            <CheckCircle className="w-4 h-4 text-primary" />
             Recent Activity
           </h2>
           <div className="space-y-4">
-            {mockActivity.map((a, i) => (
-              <div key={a.id} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center flex-shrink-0">
-                  {a.type === "analysis" ? (
-                    <BarChart2 className="w-3.5 h-3.5 text-primary" />
-                  ) : a.type === "upload" ? (
-                    <Upload className="w-3.5 h-3.5 text-green-400" />
-                  ) : (
-                    <CheckCircle className="w-3.5 h-3.5 text-secondary-text" />
+            {!resumeStats?.recentUploads?.length ? (
+              <p className="text-sm text-muted">No recent activity.</p>
+            ) : (
+              resumeStats.recentUploads.map((a) => (
+                <div key={a.id} className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center flex-shrink-0">
+                    {a.status === "completed" ? (
+                      <BarChart2 className="w-3.5 h-3.5 text-primary" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5 text-green-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-primary-text">
+                      {a.status === "completed" ? "Analyzed resume" : "Uploaded resume"}
+                    </p>
+                    <p className="text-xs text-muted">{a.file_name}</p>
+                    <p className="text-xs text-muted mt-0.5">{formatRelativeTime(a.uploaded_at)}</p>
+                  </div>
+                  {a.ats_score != null && (
+                    <span className={`text-xs font-bold flex-shrink-0 ${a.ats_score >= 80 ? 'text-green-600' : a.ats_score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {a.ats_score}
+                    </span>
                   )}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-primary-text">{a.action}</p>
-                  <p className="text-xs text-muted">{a.detail}</p>
-                  <p className="text-xs text-muted mt-0.5">{formatRelativeTime(a.time)}</p>
-                </div>
-                {a.score && (
-                  <span className={`text-xs font-bold ${getScoreColor(a.score)} flex-shrink-0`}>
-                    {a.score}
-                  </span>
-                )}
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </motion.div>
 
@@ -222,7 +283,12 @@ export default function ProfilePage() {
             Achievements
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            {achievements.map((a) => (
+            {[
+              { id: 1, name: "First Steps", description: "Uploaded your first resume", earned: (resumeStats?.total ?? 0) > 0 },
+              { id: 2, name: "Optimizer", description: "Analyzed 5 or more resumes", earned: (resumeStats?.total ?? 0) >= 5 },
+              { id: 3, name: "High Achiever", description: "Scored 80+ on ATS Match", earned: (resumeStats?.bestAts ?? 0) >= 80 },
+              { id: 4, name: "Perfectionist", description: "Scored 90+ on ATS Match", earned: (resumeStats?.bestAts ?? 0) >= 90 },
+            ].map((a) => (
               <div
                 key={a.id}
                 className={`p-4 rounded-xl border transition-all duration-200 ${
@@ -256,26 +322,31 @@ export default function ProfilePage() {
           <TrendingUp className="w-4 h-4 text-primary" />
           Score Progress
         </h2>
-        <div className="flex items-end gap-4 h-32">
-          {mockHistory.slice().reverse().map((h, i) => {
-            const maxScore = 100;
-            const height = (h.overallScore / maxScore) * 100;
-            const color = h.overallScore >= 80 ? "#22C55E" : h.overallScore >= 60 ? "#F59E0B" : "#EF4444";
-            return (
-              <div key={h.id} className="flex flex-col items-center gap-2 flex-1 group cursor-pointer">
-                <span className="text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color }}>
-                  {h.overallScore}
-                </span>
-                <div className="w-full rounded-t-lg relative" style={{ height: `${height}%`, backgroundColor: color, opacity: 0.8 }}>
-                  <div className="absolute inset-0 rounded-t-lg bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+        {(!resumeStats?.recentUploads || resumeStats.recentUploads.filter(h => h.overall_score != null).length === 0) ? (
+          <div className="flex items-center justify-center h-32 text-muted text-sm">
+            Upload resumes to track your score progress
+          </div>
+        ) : (
+          <div className="flex items-end gap-4 h-32">
+            {resumeStats.recentUploads.filter(h => h.overall_score != null).slice().reverse().map((h) => {
+              const height = h.overall_score;
+              const color = h.overall_score >= 80 ? "#16A34A" : h.overall_score >= 60 ? "#D97706" : "#DC2626";
+              return (
+                <div key={h.id} className="flex flex-col items-center gap-2 flex-1 group cursor-pointer">
+                  <span className="text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color }}>
+                    {h.overall_score}
+                  </span>
+                  <div className="w-full rounded-t-lg relative" style={{ height: `${height}%`, backgroundColor: color, opacity: 0.8 }}>
+                    <div className="absolute inset-0 rounded-t-lg bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+                  </div>
+                  <span className="text-[10px] text-muted truncate w-full text-center">
+                    {formatRelativeTime(h.uploaded_at)}
+                  </span>
                 </div>
-                <span className="text-[10px] text-muted truncate w-full text-center">
-                  {h.company}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

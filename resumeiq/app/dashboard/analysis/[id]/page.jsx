@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, use } from "react";
 import { motion } from "framer-motion";
 import {
   RadarChart,
@@ -33,10 +33,14 @@ import {
   Target,
   Zap,
   TrendingUp,
+  FileText,
   BookOpen,
+  Loader2,
+  Copy,
 } from "lucide-react";
-import { mockAnalysis } from "@/lib/mock-data";
+
 import Link from "next/link";
+import { getResumeById } from "@/lib/services/resumeService";
 
 const containerVariants = {
   hidden: {},
@@ -148,14 +152,67 @@ function InterviewCard({ q, index }) {
 }
 
 export default function AnalysisPage({ params }) {
-  const analysis = mockAnalysis;
+  // Unify params unwrapping (Next.js 15+ best practice)
+  const resolvedParams = use(params);
+  
+  const [analysis, setAnalysis] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState("overview");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const { resume, error: dbError } = await getResumeById(resolvedParams.id);
+        if (dbError || !resume) throw new Error(dbError || "Resume not found");
+        if (!resume.analysis_data) throw new Error("Analysis data is missing for this resume.");
+        
+        // Merge db fields into the structured analysis output expected by UI
+        const data = {
+          ...resume.analysis_data,
+          id: resume.id,
+          fileName: resume.file_name,
+          uploadedAt: resume.uploaded_at,
+          jobTitle: resume.job_title,
+          company: resume.company
+        };
+        setAnalysis(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [resolvedParams.id]);
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !analysis) {
+    return (
+      <div className="flex flex-col h-[60vh] items-center justify-center gap-4">
+        <AlertTriangle className="w-12 h-12 text-red-500 mb-2" />
+        <h2 className="text-xl font-bold">Analysis Not Found</h2>
+        <p className="text-secondary-text">{error || "Could not load analysis data."}</p>
+        <Link href="/dashboard">
+          <button className="mt-4 px-4 py-2 bg-card border border-border rounded-lg">Back to Dashboard</button>
+        </Link>
+      </div>
+    );
+  }
 
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "sections", label: "Sections" },
     { id: "suggestions", label: "AI Suggestions" },
     { id: "interview", label: "Interview Prep" },
+    { id: "cover-letter", label: "Cover Letter" },
   ];
 
   return (
@@ -234,7 +291,29 @@ export default function AnalysisPage({ params }) {
 
       {/* Tab Content */}
       {activeSection === "overview" && (
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          {/* AI Summary Card */}
+          <motion.div variants={itemVariants} className="bg-card border border-border rounded-card p-6">
+            <h3 className="font-heading font-semibold mb-3 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              AI Summary & Career Profile
+            </h3>
+            <p className="text-sm text-secondary-text leading-relaxed mb-4">
+              {analysis.summary}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1 bg-primary/10 border border-primary/20 text-primary rounded-full text-xs font-semibold">
+                Level: {analysis.careerLevel}
+              </span>
+              {analysis.recommendedJobRoles?.map((role, i) => (
+                <span key={i} className="px-3 py-1 bg-surface border border-border text-muted rounded-full text-xs">
+                  {role}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+
+          <div className="grid lg:grid-cols-2 gap-6">
           {/* Radar Chart */}
           <motion.div variants={itemVariants} className="bg-card border border-border rounded-card p-6">
             <h3 className="font-heading font-semibold mb-6 flex items-center gap-2">
@@ -366,6 +445,54 @@ export default function AnalysisPage({ params }) {
               ))}
             </div>
           </motion.div>
+
+          {/* Grammar & Keywords (New) */}
+          {(analysis.grammarIssues?.length > 0 || analysis.keywordSuggestions?.length > 0) && (
+            <motion.div variants={itemVariants} className="bg-card border border-border rounded-card p-6 lg:col-span-2">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Grammar Issues */}
+                <div>
+                  <h3 className="font-heading font-semibold mb-4 flex items-center gap-2 text-danger">
+                    <AlertTriangle className="w-4 h-4" />
+                    Grammar & Phrasing Issues
+                  </h3>
+                  {analysis.grammarIssues?.length > 0 ? (
+                    <ul className="space-y-3">
+                      {analysis.grammarIssues.map((g, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <div className="w-5 h-5 rounded-full bg-danger/10 border border-danger/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-danger"></span>
+                          </div>
+                          <span className="text-sm text-secondary-text">{g}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted">No major grammar issues detected!</p>
+                  )}
+                </div>
+
+                {/* Keyword Suggestions */}
+                <div>
+                  <h3 className="font-heading font-semibold mb-4 flex items-center gap-2 text-primary">
+                    <Target className="w-4 h-4" />
+                    Missing ATS Keywords
+                  </h3>
+                  {analysis.keywordSuggestions?.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {analysis.keywordSuggestions.map((k, i) => (
+                        <span key={i} className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-medium text-secondary-text">
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted">Your resume contains great keyword coverage.</p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
       )}
 
@@ -456,6 +583,33 @@ export default function AnalysisPage({ params }) {
             <InterviewCard key={i} q={q} index={i} />
           ))}
         </div>
+      )}
+
+      {activeSection === "cover-letter" && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-card border border-border rounded-xl p-8 space-y-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
+            <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Tailored Cover Letter
+            </h2>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(analysis.coverLetter);
+              }}
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-button bg-surface border border-border hover:border-primary/30 text-secondary-text hover:text-primary-text transition-all"
+            >
+              <Copy className="w-4 h-4" />
+              Copy to Clipboard
+            </button>
+          </div>
+          <div className="prose prose-invert prose-sm max-w-none text-secondary-text leading-relaxed whitespace-pre-wrap">
+            {analysis.coverLetter || "No cover letter was generated. Please try analyzing again."}
+          </div>
+        </motion.div>
       )}
     </motion.div>
   );

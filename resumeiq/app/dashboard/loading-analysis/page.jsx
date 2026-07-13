@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
-import { CheckCircle, Loader2, Zap } from "lucide-react";
+import { CheckCircle, Loader2 } from "lucide-react";
 
 const steps = [
   { id: 1, label: "Reading Resume", detail: "Parsing document structure and content" },
@@ -19,8 +19,14 @@ const STEP_DURATION = 900; // ms per step
 
 export default function LoadingAnalysisPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumeId = searchParams.get("resumeId");
+  const force = searchParams.get("force") === "true";
+  
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState(null);
+  
   const progressBarRef = useRef(null);
   const titleRef = useRef(null);
 
@@ -34,33 +40,68 @@ export default function LoadingAnalysisPage() {
       );
     }
 
-    // Step by step progression
+    if (!resumeId) {
+      setTimeout(() => setError("No resume ID provided."), 0);
+      return;
+    }
+
+    // Step by step visual progression (fake progress while API runs)
     let stepIndex = 0;
     const interval = setInterval(() => {
-      stepIndex++;
-      setCurrentStep(stepIndex);
-      const pct = Math.round((stepIndex / steps.length) * 100);
-      setProgress(pct);
+      if (stepIndex < steps.length - 1) { // Leave the last step for when the API actually finishes
+        stepIndex++;
+        setCurrentStep(stepIndex);
+        const pct = Math.round((stepIndex / steps.length) * 100);
+        setProgress(pct);
 
-      // GSAP progress bar
-      if (progressBarRef.current) {
-        gsap.to(progressBarRef.current, {
-          width: `${pct}%`,
-          duration: 0.5,
-          ease: "power2.out",
-        });
-      }
-
-      if (stepIndex >= steps.length) {
-        clearInterval(interval);
-        setTimeout(() => {
-          router.push("/dashboard/analysis/analysis-001");
-        }, 800);
+        if (progressBarRef.current) {
+          gsap.to(progressBarRef.current, {
+            width: `${pct}%`,
+            duration: 0.5,
+            ease: "power2.out",
+          });
+        }
       }
     }, STEP_DURATION);
 
+    // Make the actual API call
+    const runAnalysis = async () => {
+      try {
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resumeId, force }),
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Failed to analyze resume.");
+        }
+
+        // Fast-forward progress to 100%
+        clearInterval(interval);
+        setCurrentStep(steps.length);
+        setProgress(100);
+        
+        if (progressBarRef.current) {
+          gsap.to(progressBarRef.current, { width: "100%", duration: 0.3 });
+        }
+
+        setTimeout(() => {
+          router.push(`/dashboard/analysis/${resumeId}`);
+        }, 600);
+        
+      } catch (err) {
+        clearInterval(interval);
+        setError(err.message || "An unexpected error occurred.");
+      }
+    };
+
+    runAnalysis();
+
     return () => clearInterval(interval);
-  }, [router]);
+  }, [router, resumeId]);
 
   return (
     <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
@@ -72,9 +113,7 @@ export default function LoadingAnalysisPage() {
         {/* Logo */}
         <div className="flex justify-center mb-10">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-glow">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="ResumeIQ Logo" className="w-10 h-10 object-contain rounded-xl shadow-sm" />
             <span className="font-heading font-bold text-2xl">
               Resume<span className="gradient-text">IQ</span>
             </span>
@@ -84,11 +123,23 @@ export default function LoadingAnalysisPage() {
         {/* Animated headline */}
         <div ref={titleRef} className="text-center mb-10">
           <h1 className="font-heading text-3xl font-bold mb-3">
-            Analyzing your resume
+            {error ? "Analysis Failed" : "Analyzing your resume"}
           </h1>
           <p className="text-secondary-text">
-            Our AI is working hard to give you the best insights
+            {error ? (
+              <span className="text-red-500">{error}</span>
+            ) : (
+              "Our AI is working hard to give you the best insights"
+            )}
           </p>
+          {error && (
+            <button 
+              onClick={() => router.push("/dashboard")}
+              className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+            >
+              Back to Dashboard
+            </button>
+          )}
         </div>
 
         {/* Progress Bar */}

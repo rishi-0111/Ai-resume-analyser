@@ -1,5 +1,7 @@
 import { Poppins, Inter } from "next/font/google";
 import "./globals.css";
+import { UserProvider } from "@/lib/context/UserContext";
+import { ToastProvider } from "@/lib/context/ToastContext";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -33,7 +35,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
       <body className="bg-background text-primary-text font-body antialiased">
-        {children}
+        <UserProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </UserProvider>
       </body>
     </html>
   );

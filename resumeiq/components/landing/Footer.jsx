@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Zap, Mail, Globe2, X, ExternalLink } from "lucide-react";
+import { Mail, Globe2, X, ExternalLink } from "lucide-react";
 
 const footerLinks = {
   Product: [
@@ -39,9 +39,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
+              <img src="/logo.png" alt="ResumeIQ Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm" />
               <span className="font-heading font-bold text-xl">
                 Resume<span className="gradient-text">IQ</span>
               </span>
