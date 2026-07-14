@@ -11,9 +11,13 @@ ResumeIQ AI is a commercial-grade, premium AI-powered resume analysis SaaS platf
 - **📤 Upload & Targeted Analysis**: Features an interactive drag-and-drop zone with full file validation, alongside a dedicated field to paste specific job descriptions for target-oriented matching.
 - **⏳ Visual Pipeline Loader**: Multi-step AI processing simulation with detailed progression updates and a smooth GSAP-powered status loader.
 - **📈 Comprehensive Report Details**: Visualizes resume quality using Radar and Bar chart analytics, highlights strengths, flags weaknesses, lists missing target skills, and generates customized project roadmaps and interview preparation guides.
+- **🤖 Guidance Agent**: A context-aware AI career coach that aggregates resume data, past interviews, and market intelligence to provide personalized career advice.
+- **🎙️ Voice Interview Module**: Real-time AI interviews powered by native browser SpeechSynthesis and dynamic concept targeting.
+- **📝 MCQ Assessment**: Automated dynamic multiple-choice test generation with built-in timers, tab-switching detection, and instant evaluations.
+- **💼 Market Intelligence**: Analyzes live market trends and provides actionable insights for salary negotiations, demanding skills, and job availability.
 - **🗂️ Analysis History & Search**: Unified center to search, filter, sort, review, or delete past resume evaluations.
 - **👤 User Profile & Gamification**: Displays user performance analytics, recent logs, and unlocked milestone achievement badges.
-- **⚙️ Settings Panel**: Unified settings for appearance (theme & accent colors), notification toggles, language preferences, data privacy configurations, and a safety-modal-equipped Account deletion area.
+- **⚙️ Settings Panel**: Unified settings for appearance (real-time Dark/Light theme switching), interactive notification management, language preferences, data privacy configurations, and a safety-modal-equipped Account deletion area.
 
 ---
 
