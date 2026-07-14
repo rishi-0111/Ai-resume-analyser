@@ -24,7 +24,7 @@ export async function POST(request) {
     // 2. Fetch Session Data
     const { data: session, error: sessionError } = await supabase
       .from('interview_sessions')
-      .select('type, messages, difficulty, question_count')
+      .select('feedback, questions')
       .eq('id', sessionId)
       .eq('user_id', user.id)
       .single();
@@ -33,14 +33,15 @@ export async function POST(request) {
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
 
-    const currentMessages = session.messages || [];
+    const currentMessages = session.questions || [];
+    const meta = session.feedback || {};
 
     // Append user message
     const userMessageObj = { role: "user", content: message, timestamp: new Date().toISOString() };
     const updatedMessages = [...currentMessages, userMessageObj];
 
     // 3. Prepare payload for AI Provider
-    const systemPrompt = session.type === 'technical' ? conversationalTechPrompt : conversationalHRPrompt;
+    const systemPrompt = meta.type === 'technical' ? conversationalTechPrompt : conversationalHRPrompt;
     
     // Convert our internal DB message structure to what the NVIDIA API expects
     const apiMessages = [
@@ -64,13 +65,13 @@ export async function POST(request) {
 
     // Calculate how many questions AI has asked
     const assistantMessageCount = updatedMessages.filter(m => m.role === 'assistant').length;
-    const isLastQuestion = assistantMessageCount >= (session.question_count || 5);
+    const isLastQuestion = assistantMessageCount >= (meta.question_count || 5);
     
-    let injectedInstruction = `\n[System Note: This interview is set to ${session.difficulty || 'Medium'} difficulty.`;
+    let injectedInstruction = `\n[System Note: This interview is set to ${meta.difficulty || 'Medium'} difficulty.`;
     if (isLastQuestion) {
       injectedInstruction += ` You have reached the requested question limit. Do not ask any more questions. Politely conclude the interview and thank the candidate.]`;
     } else {
-      injectedInstruction += ` You have asked ${assistantMessageCount} questions out of ${session.question_count || 5}.]`;
+      injectedInstruction += ` You have asked ${assistantMessageCount} questions out of ${meta.question_count || 5}.]`;
     }
 
     // Append to the last user message so the AI pays attention to it
@@ -95,7 +96,7 @@ export async function POST(request) {
     // 5. Save back to Database
     const { error: updateError } = await supabase
       .from('interview_sessions')
-      .update({ messages: finalMessages })
+      .update({ questions: finalMessages })
       .eq('id', sessionId);
 
     if (updateError) {

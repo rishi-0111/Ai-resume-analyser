@@ -107,15 +107,15 @@ export async function POST(request) {
         resume_id: resumeId || null,
         job_title: jobTitle,
         job_description: jobDescription || '',
-        type: type || 'hr',
-        domain: domain || null,
-        experience_level: experienceLevel || null,
-        target_company: targetCompany || null,
-        difficulty: difficulty || 'Medium',
-        question_count: questionCount || 5,
-        messages: messagesToSave,
-        status: 'in_progress',
-        started_at: new Date().toISOString()
+        feedback: {
+          type: type || 'hr',
+          domain: domain || null,
+          experience_level: experienceLevel || null,
+          target_company: targetCompany || null,
+          difficulty: difficulty || 'Medium',
+          question_count: questionCount || 5,
+        },
+        status: 'in_progress'
       })
       .select()
       .single();
@@ -126,18 +126,14 @@ export async function POST(request) {
     }
 
     console.log(`✓ Conversational Interview session created: ${session.id}`);
-    
-    // Return the session + the initial context string so the client can store it if needed
-    // (Or we can just retrieve the resume text on every chat request. Better to just pass resumeId and fetch it on chat request, or inject it in DB).
-    // Actually, it's more efficient to just pass the contextPrompt as the very first "system" or "user" hidden message in the DB.
-    
-    // Let's UPDATE the messages to include the context so it doesn't get lost in future requests.
+
     const fullMessages = [
       { role: "system", content: contextPrompt, isHidden: true },
       { role: "assistant", content: firstAiResponse, timestamp: new Date().toISOString() }
     ];
     
-    await supabase.from('interview_sessions').update({ messages: fullMessages }).eq('id', session.id);
+    // Save messages into 'questions' column since 'messages' column doesn't exist
+    await supabase.from('interview_sessions').update({ questions: fullMessages }).eq('id', session.id);
     session.messages = fullMessages;
 
     return NextResponse.json(session);
