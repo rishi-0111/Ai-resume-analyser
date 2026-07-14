@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   RadarChart,
@@ -154,6 +155,7 @@ function InterviewCard({ q, index }) {
 export default function AnalysisPage({ params }) {
   // Unify params unwrapping (Next.js 15+ best practice)
   const resolvedParams = use(params);
+  const router = useRouter();
   
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -165,7 +167,12 @@ export default function AnalysisPage({ params }) {
       try {
         const { resume, error: dbError } = await getResumeById(resolvedParams.id);
         if (dbError || !resume) throw new Error(dbError || "Resume not found");
-        if (!resume.analysis_data) throw new Error("Analysis data is missing for this resume.");
+        
+        // If analysis_data is missing, redirect to loading-analysis to trigger it
+        if (!resume.analysis_data) {
+          router.replace(`/dashboard/loading-analysis?resumeId=${resolvedParams.id}`);
+          return;
+        }
         
         // Merge db fields into the structured analysis output expected by UI
         const data = {
@@ -184,7 +191,7 @@ export default function AnalysisPage({ params }) {
       }
     }
     loadData();
-  }, [resolvedParams.id]);
+  }, [resolvedParams.id, router]);
 
   if (loading) {
     return (
@@ -199,13 +206,22 @@ export default function AnalysisPage({ params }) {
       <div className="flex flex-col h-[60vh] items-center justify-center gap-4">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-2" />
         <h2 className="text-xl font-bold">Analysis Not Found</h2>
-        <p className="text-secondary-text">{error || "Could not load analysis data."}</p>
-        <Link href="/dashboard">
-          <button className="mt-4 px-4 py-2 bg-card border border-border rounded-lg">Back to Dashboard</button>
-        </Link>
+        <p className="text-secondary-text text-center max-w-sm">{error || "Could not load analysis data."}</p>
+        <div className="flex items-center gap-3 mt-2">
+          <button
+            onClick={() => router.push(`/dashboard/loading-analysis?resumeId=${resolvedParams.id}&force=true`)}
+            className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-accent transition-all"
+          >
+            Re-analyze Resume
+          </button>
+          <Link href="/dashboard/history">
+            <button className="px-4 py-2 bg-card border border-border rounded-lg hover:border-primary/30 transition-all">Back to History</button>
+          </Link>
+        </div>
       </div>
     );
   }
+
 
   const tabs = [
     { id: "overview", label: "Overview" },

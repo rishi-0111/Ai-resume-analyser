@@ -55,25 +55,30 @@ export async function fetchMarketJobs(jobTitle, location = "") {
 
     const data = await response.json();
     
-    if (!data.data || !Array.isArray(data.data.jobs)) {
-      throw new Error("Invalid response format from JSearch API.");
+    // JSearch API returns jobs in data.data (array) - not data.data.jobs
+    const rawJobs = Array.isArray(data.data) ? data.data : [];
+
+    if (rawJobs.length === 0) {
+      console.warn("No jobs returned from JSearch for this query.");
+      return []; // Return empty — caller handles gracefully
     }
 
     // 3. Map the response to save tokens for Gemini
     // We strictly extract only what AI needs to save token bandwidth
-    const mappedJobs = data.data.jobs.map(job => ({
+    const mappedJobs = rawJobs.map(job => ({
       title: job.job_title,
       company: job.employer_name,
-      location: job.job_city ? `${job.job_city}, ${job.job_state || ''}` : "Remote/Unknown",
+      location: job.job_city ? `${job.job_city}, ${job.job_state || ""}` : "Remote/Unknown",
       description: job.job_description,
-      salary_range: (job.job_min_salary && job.job_max_salary) 
+      salary_range: (job.job_min_salary && job.job_max_salary)
         ? `$${job.job_min_salary} - $${job.job_max_salary}`
         : "Not Specified",
       apply_link: job.job_apply_link
     })).filter(job => job.description); // Ensure we only keep jobs with descriptions
 
     if (mappedJobs.length === 0) {
-      throw new Error("No valid jobs with descriptions found for this search.");
+      console.warn("All jobs filtered out (no descriptions). Returning empty.");
+      return [];
     }
 
     // Cap at top 5 jobs to keep AI prompt within context limits

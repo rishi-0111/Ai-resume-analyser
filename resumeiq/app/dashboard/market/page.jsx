@@ -8,7 +8,7 @@ import { useToast } from "@/lib/context/ToastContext";
 
 export default function MarketIntelligenceInputPage() {
   const router = useRouter();
-  const { addToast } = useToast();
+  const { showToast } = useToast();
   
   const [resumes, setResumes] = useState([]);
   const [loadingResumes, setLoadingResumes] = useState(true);
@@ -41,12 +41,12 @@ export default function MarketIntelligenceInputPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedResumeId || !jobTitle) {
-      addToast({ title: "Error", message: "Please select a resume and enter a job title.", type: "error" });
+      showToast("Please select a resume and enter a job title.", "error");
       return;
     }
 
     setIsSubmitting(true);
-    addToast({ title: "Processing", message: "Analyzing market data. This may take a minute...", type: "info" });
+    showToast("Analyzing market data. This may take a minute...", "info");
 
     try {
       const res = await fetch("/api/market-intelligence", {
@@ -59,11 +59,11 @@ export default function MarketIntelligenceInputPage() {
       
       if (!res.ok) throw new Error(data.error || "Failed to generate market report");
       
-      addToast({ title: "Success", message: "Market analysis complete!", type: "success" });
+      showToast("Market analysis complete!", "success");
       router.push(`/dashboard/market/${data.data.id}`);
       
     } catch (error) {
-      addToast({ title: "Error", message: error.message, type: "error" });
+      showToast(error.message, "error");
       setIsSubmitting(false);
     }
   };

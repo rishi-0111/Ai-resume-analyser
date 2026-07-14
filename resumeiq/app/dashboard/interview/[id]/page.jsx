@@ -8,7 +8,6 @@ import {
   MessageSquare, Brain, Target, Star, TrendingUp, AlertTriangle, BookOpen
 } from "lucide-react";
 import { interviewService } from "@/lib/services/interviewService";
-import { supabase } from "@/lib/supabase/client";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 
@@ -63,14 +62,9 @@ export default function InterviewSession() {
     
     setIsSubmitting(true);
     try {
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      
       const response = await fetch('/api/interview/evaluate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authSession?.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: id,
           answers,

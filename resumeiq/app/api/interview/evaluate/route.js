@@ -1,26 +1,24 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { supabase } from '@/lib/supabase/client';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { INTERVIEW_EVALUATOR_PROMPT } from '@/lib/services/ai/interviewPrompts';
+
+export const maxDuration = 60;
 
 export async function POST(request) {
   try {
+    const supabase = await createSupabaseServerClient();
+
+    // 1. Verify User Authentication via cookie-based session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { sessionId, answers, questions } = await request.json();
 
     if (!sessionId || !answers || !questions) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    // 1. Verify User Authentication
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 2. Setup Gemini AI
@@ -51,16 +49,17 @@ Please evaluate this interview session completely and return the JSON payload.
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       config: {
         systemInstruction: INTERVIEW_EVALUATOR_PROMPT,
-        temperature: 0.2, // Low temp for consistent grading
+        responseMimeType: "application/json",
+        temperature: 0.2,
       },
     });
 
     // 5. Parse JSON Response
-    let jsonString = response.text;
-    if (jsonString.startsWith('```json')) {
-      jsonString = jsonString.replace(/^```json\n/, '').replace(/\n```$/, '');
-    }
-    
+    let jsonString = response.text
+      .replace(/^```json\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+
     let evaluationData;
     try {
       evaluationData = JSON.parse(jsonString);
@@ -76,11 +75,11 @@ Please evaluate this interview session completely and return the JSON payload.
         answers: answers,
         scores: evaluationData.scores,
         feedback: {
-          strengths: evaluationData.feedback.strengths,
-          weaknesses: evaluationData.feedback.weaknesses,
-          personalizedTips: evaluationData.feedback.personalizedTips,
-          learningRoadmap: evaluationData.learningRoadmap,
-          questionEvaluations: evaluationData.questionEvaluations
+          strengths: evaluationData.feedback?.strengths || [],
+          weaknesses: evaluationData.feedback?.weaknesses || [],
+          personalizedTips: evaluationData.feedback?.personalizedTips || [],
+          learningRoadmap: evaluationData.learningRoadmap || [],
+          questionEvaluations: evaluationData.questionEvaluations || []
         },
         status: 'completed',
         updated_at: new Date().toISOString()
@@ -95,7 +94,7 @@ Please evaluate this interview session completely and return the JSON payload.
       throw new Error("Failed to update session with evaluation results");
     }
 
-    // 7. Return the completed session
+    console.log("✓ Interview evaluation complete for session:", sessionId);
     return NextResponse.json(session);
 
   } catch (error) {

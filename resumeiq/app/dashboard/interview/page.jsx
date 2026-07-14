@@ -47,18 +47,11 @@ export default function InterviewHub() {
     setIsGenerating(true);
 
     try {
-      const selectedResume = resumes.find(r => r.id === selectedResumeId);
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await fetch('/api/interview/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           resumeId: selectedResumeId,
-          resumeText: selectedResume?.content || "Resume Content Missing",
           jobTitle,
           jobDescription
         })
@@ -112,7 +105,7 @@ export default function InterviewHub() {
                 >
                   <option value="" disabled>Choose a resume...</option>
                   {resumes.map(r => (
-                    <option key={r.id} value={r.id}>{r.title || "Untitled Resume"}</option>
+                    <option key={r.id} value={r.id}>{r.file_name || "Untitled Resume"}</option>
                   ))}
                 </select>
               </div>

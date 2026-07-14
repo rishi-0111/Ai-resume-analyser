@@ -166,21 +166,24 @@ export async function getResumeStats(userId) {
  * @param {string} filePath
  * @returns {object} { error }
  */
-export async function deleteResume(resumeId, filePath) {
-  let storageError = null;
-  // 1. Delete from storage
-  if (filePath) {
-    const { error } = await supabase.storage.from(BUCKET).remove([filePath]);
-    storageError = error;
+export async function deleteResume(resumeId) {
+  try {
+    const res = await fetch("/api/resume/delete", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resumeId }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      return { error: data.error || "Failed to delete resume." };
+    }
+
+    return { error: null };
+  } catch (err) {
+    return { error: err.message || "Network error during delete." };
   }
-
-  // 2. Delete from DB
-  const { error: dbError } = await supabase
-    .from("resumes")
-    .delete()
-    .eq("id", resumeId);
-
-  return { error: (storageError?.message || dbError?.message) ?? null };
 }
 
 /**

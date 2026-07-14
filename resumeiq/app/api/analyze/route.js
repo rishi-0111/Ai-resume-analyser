@@ -94,10 +94,11 @@ export async function POST(request) {
       }
     }
 
-    // Extract top-level scores for DB columns
+    // Extract top-level scores for DB columns + save raw_text for market intelligence
     const updatePayload = {
       status: "completed",
       analysis_data: analysisData,
+      raw_text: resumeText,
       overall_score: analysisData.overallScore,
       ats_score: analysisData.atsScore,
       job_match: analysisData.jobMatch || 0

@@ -133,7 +133,7 @@ export default function HistoryPage() {
   const handleDeleteResume = async (resume) => {
     if (!confirm(`Delete resume "${resume.file_name}"? This cannot be undone.`)) return;
     setDeletingId(resume.id);
-    const { error } = await deleteResume(resume.id, resume.file_path);
+    const { error } = await deleteResume(resume.id);
     if (error) {
       showToast("Failed to delete resume: " + error, "error");
     } else {
