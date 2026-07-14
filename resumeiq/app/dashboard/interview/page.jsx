@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { MessageSquare, Briefcase, Play, Loader2, Search, ArrowRight } from "lucide-react";
+import { MessageSquare, Briefcase, Play, Loader2, Search, ArrowRight, History } from "lucide-react";
 import { getResumes } from "@/lib/services/resumeService";
 import { interviewService } from "@/lib/services/interviewService";
 import { supabase } from "@/lib/supabase/client";

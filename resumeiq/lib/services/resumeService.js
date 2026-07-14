@@ -167,18 +167,20 @@ export async function getResumeStats(userId) {
  * @returns {object} { error }
  */
 export async function deleteResume(resumeId, filePath) {
+  let storageError = null;
   // 1. Delete from storage
   if (filePath) {
-    await supabase.storage.from(BUCKET).remove([filePath]);
+    const { error } = await supabase.storage.from(BUCKET).remove([filePath]);
+    storageError = error;
   }
 
   // 2. Delete from DB
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from("resumes")
     .delete()
     .eq("id", resumeId);
 
-  return { error: storageError?.message ?? null };
+  return { error: (storageError?.message || dbError?.message) ?? null };
 }
 
 /**

@@ -51,17 +51,19 @@ export default function HistoryPage() {
     setLoading(true);
     
     Promise.all([
-      getResumes(user.id),
-      getCareerReports(user.id),
+      getResumes(user.id).catch(e => ({ error: e.message, resumes: [] })),
+      getCareerReports(user.id).catch(e => ({ error: e.message, reports: [] })),
       interviewService.getSessions().catch(() => []) // fail gracefully
     ]).then(([resumesData, reportsData, interviewsData]) => {
-      if (resumesData.error || reportsData.error) {
-        showToast("Failed to load history.", "error");
-      } else {
-        setResumes(resumesData.resumes);
-        setReports(reportsData.reports);
-        setInterviews(interviewsData);
-      }
+      if (resumesData.error) showToast("Failed to load resumes.", "error");
+      if (reportsData.error) showToast("Failed to load market reports.", "error");
+      
+      setResumes(resumesData.resumes || []);
+      setReports(reportsData.reports || []);
+      setInterviews(interviewsData || []);
+      setLoading(false);
+    }).catch(err => {
+      showToast("Error loading history: " + err.message, "error");
       setLoading(false);
     });
   }, [user, showToast]);
@@ -69,9 +71,9 @@ export default function HistoryPage() {
   // Filter + sort for Resumes
   const filteredResumes = resumes
     .filter((h) =>
-      h.file_name.toLowerCase().includes(search.toLowerCase()) ||
-      (h.job_title ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (h.company ?? "").toLowerCase().includes(search.toLowerCase())
+      (h.file_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (h.job_title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (h.company || "").toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
       if (sort === "Newest First") return new Date(b.uploaded_at) - new Date(a.uploaded_at);
@@ -84,9 +86,9 @@ export default function HistoryPage() {
   // Filter + sort for Market Reports
   const filteredReports = reports
     .filter((h) =>
-      h.job_title.toLowerCase().includes(search.toLowerCase()) ||
-      (h.location ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (h.resumes?.file_name ?? "").toLowerCase().includes(search.toLowerCase())
+      (h.job_title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (h.location || "").toLowerCase().includes(search.toLowerCase()) ||
+      (h.resumes?.file_name || "").toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
       if (sort === "Newest First") return new Date(b.created_at) - new Date(a.created_at);
@@ -101,8 +103,8 @@ export default function HistoryPage() {
   // Filter + sort for Interviews
   const filteredInterviews = interviews
     .filter((h) =>
-      h.job_title.toLowerCase().includes(search.toLowerCase()) ||
-      (h.resumes?.title ?? "").toLowerCase().includes(search.toLowerCase())
+      (h.job_title || "").toLowerCase().includes(search.toLowerCase()) ||
+      (h.resumes?.file_name || "").toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
       if (sort === "Newest First") return new Date(b.created_at) - new Date(a.created_at);

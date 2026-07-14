@@ -12,7 +12,7 @@ export const interviewService = {
       .from('interview_sessions')
       .select(`
         *,
-        resumes ( title )
+        resumes ( file_name )
       `)
       .eq('user_id', userData.user.id)
       .order('created_at', { ascending: false });
