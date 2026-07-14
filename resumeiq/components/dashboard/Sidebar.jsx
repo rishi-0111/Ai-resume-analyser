@@ -14,9 +14,9 @@ import {
   ChevronRight,
   TrendingUp,
   LogOut,
-  X,
   Bell,
   Briefcase,
+  Compass,
 } from "lucide-react";
 import { mockUser } from "@/lib/mock-data";
 import { useUser } from "@/lib/context/UserContext";
@@ -28,6 +28,7 @@ const navItems = [
   { icon: History, label: "History", href: "/dashboard/history" },
   { icon: Briefcase, label: "Market Intelligence", href: "/dashboard/market" },
   { icon: TrendingUp, label: "Interview Prep", href: "/dashboard/interview" },
+  { icon: Compass, label: "Guidance Agent", href: "/dashboard/guidance" },
   { icon: User, label: "Profile", href: "/dashboard/profile" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];

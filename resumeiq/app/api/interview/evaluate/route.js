@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { INTERVIEW_EVALUATOR_PROMPT } from '@/lib/services/ai/interviewPrompts';
+import { generateAIResponse } from '@/lib/ai/provider';
+import { interviewFeedbackPrompt } from '@/lib/ai/prompts';
 
 export const maxDuration = 60;
 
@@ -9,77 +9,71 @@ export async function POST(request) {
   try {
     const supabase = await createSupabaseServerClient();
 
-    // 1. Verify User Authentication via cookie-based session
+    // 1. Verify User Authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { sessionId, answers, questions } = await request.json();
+    const { sessionId, duration } = await request.json();
 
-    if (!sessionId || !answers || !questions) {
+    if (!sessionId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // 2. Setup Gemini AI
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("Missing GEMINI_API_KEY environment variable");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    // 2. Fetch the session and transcript
+    const { data: session, error: dbErrorFetch } = await supabase
+      .from('interview_sessions')
+      .select('messages, type, domain, job_title')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .single();
 
-    // 3. Construct Prompt mapped clearly for the AI
-    const interviewData = questions.map(q => ({
-      question: q.question,
-      category: q.category,
-      expectedPoints: q.expectedKeyPoints,
-      candidateAnswer: answers[q.id] || "NO ANSWER PROVIDED"
-    }));
+    if (dbErrorFetch || !session) {
+      return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    }
+
+    const messages = session.messages || [];
+    
+    // Filter out hidden system context and format as a readable transcript
+    const transcript = messages
+      .filter(m => m.role !== 'system')
+      .map(m => `${m.role === 'assistant' ? 'Interviewer' : 'Candidate'}: ${m.content}`)
+      .join('\n\n');
 
     const userPrompt = `
-Here is the mock interview data:
+Here is the transcript of a ${session.type} interview for the role of ${session.job_title}.
 
-${JSON.stringify(interviewData, null, 2)}
+--- TRANSCRIPT START ---
+${transcript}
+--- TRANSCRIPT END ---
 
-Please evaluate this interview session completely and return the JSON payload.
+Please evaluate this interview session completely and provide comprehensive feedback on the candidate's performance.
     `;
 
-    // 4. Call Gemini
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      config: {
-        systemInstruction: INTERVIEW_EVALUATOR_PROMPT,
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      },
+    // 3. Call NVIDIA NIM Provider for Interview Feedback
+    const evaluationData = await generateAIResponse({
+      systemPrompt: interviewFeedbackPrompt,
+      userPrompt,
+      temperature: 0.2, // Low temperature for analytical evaluation
+      maxTokens: 2000,
     });
 
-    // 5. Parse JSON Response
-    let jsonString = response.text
-      .replace(/^```json\s*/i, '')
-      .replace(/```\s*$/i, '')
-      .trim();
-
-    let evaluationData;
-    try {
-      evaluationData = JSON.parse(jsonString);
-    } catch (e) {
-      console.error("Gemini returned invalid JSON:", jsonString);
-      throw new Error("Failed to parse AI evaluation");
-    }
-
-    // 6. Update Database Session
-    const { data: session, error: dbError } = await supabase
+    // 4. Update Database Session
+    const { data: updatedSession, error: dbError } = await supabase
       .from('interview_sessions')
       .update({
-        answers: answers,
-        scores: evaluationData.scores,
+        overall_score: evaluationData.overallScore,
+        duration: duration || 0,
+        completed_at: new Date().toISOString(),
+        scores: { overall: evaluationData.overallScore },
         feedback: {
-          strengths: evaluationData.feedback?.strengths || [],
-          weaknesses: evaluationData.feedback?.weaknesses || [],
-          personalizedTips: evaluationData.feedback?.personalizedTips || [],
-          learningRoadmap: evaluationData.learningRoadmap || [],
-          questionEvaluations: evaluationData.questionEvaluations || []
+          communication: evaluationData.communication,
+          technicalKnowledge: evaluationData.technicalKnowledge,
+          confidence: evaluationData.confidence,
+          problemSolving: evaluationData.problemSolving,
+          suggestions: evaluationData.suggestions || [],
+          nextLearningTopics: evaluationData.nextLearningTopics || []
         },
         status: 'completed',
         updated_at: new Date().toISOString()
@@ -95,7 +89,7 @@ Please evaluate this interview session completely and return the JSON payload.
     }
 
     console.log("✓ Interview evaluation complete for session:", sessionId);
-    return NextResponse.json(session);
+    return NextResponse.json(updatedSession);
 
   } catch (error) {
     console.error("Interview Evaluation Error:", error);

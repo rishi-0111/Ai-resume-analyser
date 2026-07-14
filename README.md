@@ -87,6 +87,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_PROJECT_REF=your-project-ref
+
+# AI Provider Credentials (NVIDIA NIM)
+NVIDIA_API_KEY=your-nvidia-api-key
+NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 ```
 
 ### 3. Run the Development Server
@@ -101,3 +105,29 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser to view 
 
 - **Supabase Keys**: Public access uses the client-side `supabase` client with the `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Administrative operations are handled via `supabaseAdmin` using the service role key and are executed strictly on server-side functions.
 - **Git Safety**: `.env.local` is added to `.gitignore` to prevent secret credentials leakage.
+
+---
+
+## 🤖 AI Architecture (NVIDIA NIM)
+
+ResumeIQ utilizes a clean provider abstraction for its AI features, ensuring high maintainability and easy swapping of underlying models (NVIDIA, OpenAI, Gemini). Currently, the system uses the NVIDIA NIM API for fast, high-quality inference.
+
+### Folder Structure
+All AI logic is centralized in the `/lib/ai/` directory:
+- `provider.js`: The core abstraction handling API calls, retries, timeouts, rate-limit awareness, JSON parsing safeguards, and logging.
+- `nvidia.js`: The NVIDIA OpenAI-compatible client configuration.
+- `prompts.js`: Centralized prompt templates for various generation and evaluation features. No prompts are hardcoded inside React components.
+- `voice.js`: Stubs and placeholders for upcoming voice-based AI interview capabilities.
+
+### How to Switch AI Providers
+Because the `provider.js` uses the standard `openai` Node.js SDK pointed at the NVIDIA base URL, switching back to standard OpenAI (or another compatible provider) is trivial:
+1. Update `NVIDIA_API_KEY` to `OPENAI_API_KEY` (or the respective provider key).
+2. Remove or change the `NVIDIA_BASE_URL` in `nvidia.js`.
+3. Change the default `model` string in `provider.js` to the desired model (e.g., `gpt-4o`).
+
+### How to Add New Prompt Templates
+To introduce a new AI feature:
+1. Define a new template string in `/lib/ai/prompts.js` and export it.
+2. Create a new API route in `/app/api/interview/` (e.g., `/app/api/interview/coding/route.js`).
+3. Import the `generateAIResponse` from `/lib/ai/provider.js` and your new prompt template.
+4. Pass the prompt and user data to `generateAIResponse`, which safely returns the generated JSON.
