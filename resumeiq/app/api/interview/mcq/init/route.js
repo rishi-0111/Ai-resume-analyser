@@ -77,13 +77,9 @@ export async function POST(request) {
         user_id: user.id,
         resume_id: resumeId || null,
         job_title: jobTitle,
-        domain: domain || null,
-        experience_level: experienceLevel || null,
-        difficulty: difficulty || 'Medium',
-        question_count: count,
+        job_description: `Domain: ${domain || 'N/A'}. Level: ${experienceLevel || 'N/A'}. Type: MCQ`,
         questions: questions,
-        status: 'in_progress',
-        type: 'mcq'
+        status: 'in_progress'
       })
       .select('id')
       .single();
