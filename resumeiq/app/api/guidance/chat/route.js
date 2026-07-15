@@ -70,7 +70,8 @@ export async function POST(request) {
     // 4. Call NVIDIA NIM
     const aiResponseText = await generateAIResponse({
       messages: finalMessages,
-      temperature: 0.6 // Slightly creative but grounded
+      temperature: 0.6, // Slightly creative but grounded
+      isJson: false
     });
 
     return NextResponse.json({ 
