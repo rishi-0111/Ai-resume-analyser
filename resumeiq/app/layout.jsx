@@ -34,7 +34,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
+    <html lang="en" className={`${poppins.variable} ${inter.variable}`} suppressHydrationWarning>
       <body className="bg-background text-primary-text font-body antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <UserProvider>
