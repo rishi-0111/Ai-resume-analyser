@@ -59,7 +59,7 @@ export function useInterview({ type = "hr" } = {}) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          resumeId: selectedResume?.id || null,
+          resumeId: selectedResume?.id === "skip" ? null : (selectedResume?.id || null),
           jobTitle: setupData.role,
           domain: setupData.domain,
           experienceLevel: setupData.experienceLevel,

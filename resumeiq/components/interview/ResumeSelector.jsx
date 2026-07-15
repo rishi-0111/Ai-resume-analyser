@@ -134,6 +134,36 @@ export default function ResumeSelector({ selected, onSelect }) {
           </motion.button>
         );
       })}
+
+      {/* Skip Resume Option */}
+      <motion.button
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: resumes.length * 0.05 }}
+        onClick={() => onSelect({ id: "skip", file_name: "General Interview (No Resume)" })}
+        className={`relative text-left p-5 rounded-card border-2 border-dashed transition-all duration-200 group cursor-pointer flex flex-col justify-center items-center text-center ${
+          selected?.id === "skip"
+            ? "border-primary bg-primary/5 shadow-glow-sm"
+            : "border-border bg-card hover:border-primary/30 hover:shadow-card"
+        }`}
+      >
+        {selected?.id === "skip" && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute top-3 right-3"
+          >
+            <CheckCircle className="w-5 h-5 text-primary" />
+          </motion.div>
+        )}
+        <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center mb-2">
+          <Sparkles className="w-5 h-5 text-muted group-hover:text-primary transition-colors" />
+        </div>
+        <p className="font-semibold text-sm text-primary-text">Skip Resume</p>
+        <p className="text-xs text-muted mt-1">
+          Have a general interview without tying it to a specific resume.
+        </p>
+      </motion.button>
     </div>
   );
 }
