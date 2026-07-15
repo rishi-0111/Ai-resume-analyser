@@ -61,8 +61,15 @@ export async function POST(request) {
     // 3. Parse JSON
     let generatedData;
     try {
-      const cleaned = aiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      generatedData = JSON.parse(cleaned);
+      const startIndex = aiResponseText.indexOf('{');
+      const endIndex = aiResponseText.lastIndexOf('}');
+      
+      if (startIndex !== -1 && endIndex !== -1) {
+        const jsonStr = aiResponseText.substring(startIndex, endIndex + 1);
+        generatedData = JSON.parse(jsonStr);
+      } else {
+        throw new Error("No JSON object found in response");
+      }
     } catch (e) {
       console.error("Failed to parse MCQ JSON:", aiResponseText);
       return NextResponse.json({ error: "AI returned invalid JSON format." }, { status: 500 });
