@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import {
   Moon,
   Sun,
@@ -70,8 +73,14 @@ function SettingRow({ icon: Icon, title, description, right }) {
 }
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
+  const router = useRouter();
+  const supabase = createClient();
+  
   const [activeTab, setActiveTab] = useState("appearance");
-  const [theme, setTheme] = useState("dark");
+  const [accentColor, setAccentColor] = useState("#2563EB");
+  
+  // Persisted state
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -86,6 +95,90 @@ export default function SettingsPage() {
     twoFactor: false,
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedNotifs = localStorage.getItem("resumeiq_notifications");
+    if (savedNotifs) setNotifications(JSON.parse(savedNotifs));
+    
+    const savedLang = localStorage.getItem("resumeiq_language");
+    if (savedLang) setLanguage(savedLang);
+    
+    const savedPrivacy = localStorage.getItem("resumeiq_privacy");
+    if (savedPrivacy) setPrivacy(JSON.parse(savedPrivacy));
+    
+    const savedAccent = localStorage.getItem("resumeiq_accent");
+    if (savedAccent) setAccentColor(savedAccent);
+  }, []);
+
+  // Save to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem("resumeiq_notifications", JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem("resumeiq_language", language);
+  }, [language]);
+
+  useEffect(() => {
+    localStorage.setItem("resumeiq_privacy", JSON.stringify(privacy));
+  }, [privacy]);
+
+  useEffect(() => {
+    localStorage.setItem("resumeiq_accent", accentColor);
+    // document.documentElement.style.setProperty('--primary', accentColor); // Simplified for now
+  }, [accentColor]);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch('/api/settings/export');
+      if (!res.ok) throw new Error("Failed to export");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `resumeiq_data_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      alert("Error exporting data");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (!confirm("Are you sure you want to clear all analysis and interview history?")) return;
+    setIsClearing(true);
+    try {
+      const res = await fetch('/api/settings/clear-history', { method: 'DELETE' });
+      if (!res.ok) throw new Error("Failed to clear history");
+      alert("History cleared successfully.");
+    } catch (err) {
+      alert("Error clearing history.");
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      // Soft delete: clear their data via API, then sign out
+      await fetch('/api/settings/clear-history', { method: 'DELETE' });
+      await supabase.auth.signOut();
+      router.push('/login');
+    } catch (err) {
+      alert("Error deleting account.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const languages = [
     { code: "en", label: "English (US)" },
@@ -184,7 +277,8 @@ export default function SettingsPage() {
                     ].map((color) => (
                       <button
                         key={color}
-                        className="w-8 h-8 rounded-full border-2 border-transparent hover:border-white transition-all hover:scale-110"
+                        onClick={() => setAccentColor(color)}
+                        className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${accentColor === color ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-border'}`}
                         style={{ backgroundColor: color }}
                         aria-label={`Set accent color to ${color}`}
                       />
@@ -384,8 +478,12 @@ export default function SettingsPage() {
                         Download a copy of all your resume data
                       </p>
                     </div>
-                    <button className="text-sm font-medium px-4 py-2 border border-border rounded-button hover:border-primary/30 text-secondary-text hover:text-primary-text transition-all">
-                      Export
+                    <button 
+                      onClick={handleExport}
+                      disabled={isExporting}
+                      className="text-sm font-medium px-4 py-2 border border-border rounded-button hover:border-primary/30 text-secondary-text hover:text-primary-text transition-all disabled:opacity-50"
+                    >
+                      {isExporting ? 'Exporting...' : 'Export'}
                     </button>
                   </div>
 
@@ -396,8 +494,12 @@ export default function SettingsPage() {
                         Remove all resume analysis history
                       </p>
                     </div>
-                    <button className="text-sm font-medium px-4 py-2 border border-warning/30 bg-warning/10 rounded-button text-warning hover:bg-warning/20 transition-all">
-                      Clear History
+                    <button 
+                      onClick={handleClearHistory}
+                      disabled={isClearing}
+                      className="text-sm font-medium px-4 py-2 border border-warning/30 bg-warning/10 rounded-button text-warning hover:bg-warning/20 transition-all disabled:opacity-50"
+                    >
+                      {isClearing ? 'Clearing...' : 'Clear History'}
                     </button>
                   </div>
 
@@ -455,8 +557,12 @@ export default function SettingsPage() {
                   >
                     Cancel
                   </button>
-                  <button className="flex-1 py-3 rounded-button bg-danger text-white font-semibold hover:bg-danger/90 transition-all">
-                    Yes, Delete Everything
+                  <button 
+                    onClick={handleDeleteAccount}
+                    disabled={isDeleting}
+                    className="flex-1 py-3 rounded-button bg-danger text-white font-semibold hover:bg-danger/90 transition-all disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Yes, Delete Everything'}
                   </button>
                 </div>
               </div>
