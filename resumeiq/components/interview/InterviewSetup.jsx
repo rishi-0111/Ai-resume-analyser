@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Briefcase, Code, Building, GraduationCap, Target, Layers, Hash, Lightbulb } from "lucide-react";
+import { Search, Briefcase, Code, Building, GraduationCap, Target, Layers, Hash, Lightbulb, User } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function InterviewSetup({ value, onChange, onSubmit, isTechnical = false, isVoice = false }) {
