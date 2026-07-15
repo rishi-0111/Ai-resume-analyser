@@ -98,7 +98,68 @@ export default function InterviewSession() {
   // STATE: RESULTS DASHBOARD (COMPLETED)
   // -----------------------------------------------------
   if (session.status === 'completed' && session.scores) {
-    const { scores, feedback } = session;
+    if (session.type === 'mcq') {
+      return (
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-12">
+          <div className="flex items-center justify-between border-b border-border pb-6">
+            <div>
+              <h1 className="text-3xl font-heading font-bold text-primary-text mb-2">
+                MCQ <span className="gradient-text">Results</span>
+              </h1>
+              <p className="text-secondary-text">Feedback for: {session.job_title}</p>
+            </div>
+            <button 
+              onClick={() => router.push('/dashboard/interview')}
+              className="flex items-center gap-2 text-sm text-muted hover:text-primary-text transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Hub
+            </button>
+          </div>
+
+          <div className="bg-card border border-border p-10 rounded-2xl shadow-sm text-center">
+            <div className="w-20 h-20 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-10 h-10" />
+            </div>
+            <h2 className="font-heading text-3xl font-bold text-primary-text mb-2">Test Completed!</h2>
+            <div className="inline-block p-6 bg-surface border border-border rounded-xl mt-6">
+              <div className="text-5xl font-black gradient-text mb-2">{session.scores.overall}%</div>
+              <div className="text-sm font-medium text-secondary-text uppercase tracking-wider">Overall Score</div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold text-primary-text">Question Review</h3>
+            {session.answers?.map((ans, i) => (
+              <div key={i} className={`glass-panel p-6 rounded-2xl border-l-4 ${ans.isCorrect ? 'border-l-green-500' : 'border-l-red-500'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded">
+                    Question {i + 1}
+                  </span>
+                  <span className={`text-sm font-bold px-2 py-1 rounded ${ans.isCorrect ? 'text-green-500 bg-green-500/10' : 'text-red-500 bg-red-500/10'}`}>
+                    {ans.isCorrect ? 'Correct' : 'Incorrect'}
+                  </span>
+                </div>
+                <h4 className="text-lg font-medium text-primary-text mb-4">{ans.question}</h4>
+                
+                <div className="bg-surface p-4 rounded-xl border border-border mb-4">
+                  <span className="text-xs font-bold text-muted uppercase block mb-2">Your Answer:</span>
+                  <p className={`font-medium ${ans.isCorrect ? 'text-green-500' : 'text-red-500'}`}>{ans.userAnswer || "No answer provided"}</p>
+                </div>
+                
+                {!ans.isCorrect && (
+                  <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20">
+                    <span className="text-xs font-bold text-green-500 uppercase block mb-2">Correct Answer:</span>
+                    <p className="text-green-500 font-medium">{ans.correctAnswer}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    const { scores, feedback = {} } = session;
     return (
       <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-12">
         <div className="flex items-center justify-between">
