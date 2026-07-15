@@ -6,7 +6,23 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(forceVoiceMode);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const messagesEndRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+
+  // Timer Effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -33,6 +49,20 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
             currentTranscript += event.results[i][0].transcript;
           }
           setInput(prev => prev + " " + currentTranscript);
+          
+          // Auto-submit silence detection
+          if (isVoiceMode) {
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = setTimeout(() => {
+              // Trigger submit if we have input
+              const currentInput = document.getElementById("chat-input")?.value || "";
+              if (currentInput.trim()) {
+                setIsListening(false);
+                onSendMessage(currentInput.trim());
+                setInput("");
+              }
+            }, 2500); // 2.5 seconds of silence
+          }
         };
 
         recognition.onend = () => {
@@ -46,6 +76,7 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
       }
     }
     return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (recognition) {
         recognition.onend = null;
         recognition.stop();
@@ -144,6 +175,9 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
           <div>
             <h3 className="font-heading font-semibold text-primary-text text-sm flex items-center gap-2">
               AI Interviewer
+              <span className="text-xs font-mono bg-surface border border-border px-2 py-0.5 rounded text-muted">
+                {formatTime(elapsedTime)}
+              </span>
               {!forceVoiceMode && (
                 <button 
                   onClick={() => setIsVoiceMode(!isVoiceMode)}
@@ -231,6 +265,7 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
           </button>
           
           <textarea
+            id="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {

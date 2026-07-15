@@ -100,6 +100,9 @@ export function useInterview({ type = "hr" } = {}) {
     setError(null);
 
     try {
+      // Artificial "Thinking" delay to make the AI feel more human
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       const res = await fetch(`/api/interview/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
