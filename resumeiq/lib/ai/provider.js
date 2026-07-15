@@ -58,10 +58,23 @@ export async function generateAIResponse({
       }
 
       // JSON Parsing Safeguards
-      let jsonString = responseText
-        .replace(/^```json\s*/i, '') // Remove markdown json tags if present
-        .replace(/```\s*$/i, '')
-        .trim();
+      let jsonString = responseText;
+      const firstBrace = jsonString.indexOf('{');
+      const firstBracket = jsonString.indexOf('[');
+      const lastBrace = jsonString.lastIndexOf('}');
+      const lastBracket = jsonString.lastIndexOf(']');
+      
+      const firstObj = firstBrace !== -1 ? firstBrace : Infinity;
+      const firstArr = firstBracket !== -1 ? firstBracket : Infinity;
+      const firstIdx = Math.min(firstObj, firstArr);
+      
+      const lastObj = lastBrace !== -1 ? lastBrace : -1;
+      const lastArr = lastBracket !== -1 ? lastBracket : -1;
+      const lastIdx = Math.max(lastObj, lastArr);
+      
+      if (firstIdx !== Infinity && lastIdx !== -1 && firstIdx < lastIdx) {
+        jsonString = jsonString.substring(firstIdx, lastIdx + 1);
+      }
 
       try {
         const parsedJson = JSON.parse(jsonString);

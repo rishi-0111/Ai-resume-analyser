@@ -58,20 +58,11 @@ export async function POST(request) {
       temperature: 0.7
     });
 
-    // 3. Parse JSON
-    let generatedData;
-    try {
-      const startIndex = aiResponseText.indexOf('{');
-      const endIndex = aiResponseText.lastIndexOf('}');
-      
-      if (startIndex !== -1 && endIndex !== -1) {
-        const jsonStr = aiResponseText.substring(startIndex, endIndex + 1);
-        generatedData = JSON.parse(jsonStr);
-      } else {
-        throw new Error("No JSON object found in response");
-      }
-    } catch (e) {
-      console.error("Failed to parse MCQ JSON:", aiResponseText);
+    // 3. Parse JSON (handled by generateAIResponse provider)
+    let generatedData = aiResponseText;
+    
+    if (!generatedData || typeof generatedData !== 'object') {
+      console.error("Failed to parse MCQ JSON, provider returned:", aiResponseText);
       return NextResponse.json({ error: "AI returned invalid JSON format." }, { status: 500 });
     }
 
