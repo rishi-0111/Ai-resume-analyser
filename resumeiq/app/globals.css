@@ -11,19 +11,19 @@
   --font-family-body: "Inter", sans-serif;
   --font-family-sans: "Inter", sans-serif;
 
-  /* Colors mapped to variables for theme switching */
-  --color-background: var(--theme-background);
-  --color-surface: var(--theme-surface);
-  --color-card: var(--theme-card);
-  --color-primary: var(--theme-primary);
-  --color-accent: var(--theme-accent);
-  --color-success: var(--theme-success);
-  --color-warning: var(--theme-warning);
-  --color-danger: var(--theme-danger);
-  --color-border: var(--theme-border);
-  --color-primary-text: var(--theme-primary-text);
-  --color-secondary-text: var(--theme-secondary-text);
-  --color-muted: var(--theme-muted);
+  /* Colors */
+  --color-background: #F9FAFB;
+  --color-surface: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-primary: #DC2626;      /* Vibrant Red */
+  --color-accent: #EF4444;       /* Accent Red */
+  --color-success: #16A34A;      /* Contrasting Green */
+  --color-warning: #D97706;      /* Contrasting Amber */
+  --color-danger: #DC2626;
+  --color-border: #E5E7EB;       /* Light border */
+  --color-primary-text: #111827; /* Dark Slate */
+  --color-secondary-text: #4B5563; /* Medium Grey */
+  --color-muted: #9CA3AF;        /* Light Muted Grey */
 
   /* Border radius */
   --radius-button: 12px;
@@ -38,52 +38,35 @@
   --animate-spin-slow: spin 8s linear infinite;
 
   /* Shadows - Updated for light theme */
-  --shadow-card: var(--theme-shadow-card);
-  --shadow-glow: var(--theme-shadow-glow);
-  --shadow-glow-sm: var(--theme-shadow-glow-sm);
-  --shadow-premium: var(--theme-shadow-premium);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 40px rgba(220, 38, 38, 0.12);
+  --shadow-glow-sm: 0 0 20px rgba(220, 38, 38, 0.08);
+  --shadow-premium: 0 20px 40px -15px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(220, 38, 38, 0.04);
 }
 
-:root {
-  --theme-background: #F9FAFB;
-  --theme-surface: #FFFFFF;
-  --theme-card: #FFFFFF;
-  --theme-primary: #DC2626;      /* Vibrant Red */
-  --theme-accent: #EF4444;       /* Accent Red */
-  --theme-success: #16A34A;      /* Contrasting Green */
-  --theme-warning: #D97706;      /* Contrasting Amber */
-  --theme-danger: #DC2626;
-  --theme-border: #E5E7EB;       /* Light border */
-  --theme-primary-text: #111827; /* Dark Slate */
-  --theme-secondary-text: #4B5563; /* Medium Grey */
-  --theme-muted: #9CA3AF;        /* Light Muted Grey */
-
-  --theme-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.04);
-  --theme-shadow-glow: 0 0 40px rgba(220, 38, 38, 0.12);
-  --theme-shadow-glow-sm: 0 0 20px rgba(220, 38, 38, 0.08);
-  --theme-shadow-premium: 0 20px 40px -15px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(220, 38, 38, 0.04);
+@layer theme {
+  .dark {
+    --color-background: #0B1120;
+    --color-surface: #111827;
+    --color-card: #161F33;
+    --color-primary: #2563EB;      /* Blue */
+    --color-accent: #3B82F6;       
+    --color-success: #22C55E;      
+    --color-warning: #F59E0B;      
+    --color-danger: #EF4444;
+    --color-border: #1F2937;       
+    --color-primary-text: #F8FAFC; 
+    --color-secondary-text: #94A3B8; 
+    --color-muted: #64748B;        
+    
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 40px rgba(37, 99, 235, 0.3);
+    --shadow-glow-sm: 0 0 20px rgba(37, 99, 235, 0.2);
+    --shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(37,99,235,0.1);
+  }
 }
 
-.dark {
-  --theme-background: #0B1120;
-  --theme-surface: #111827;
-  --theme-card: #161F33;
-  --theme-primary: #2563EB;      /* Blue */
-  --theme-accent: #3B82F6;       
-  --theme-success: #22C55E;      
-  --theme-warning: #F59E0B;      
-  --theme-danger: #EF4444;
-  --theme-border: #1F2937;       
-  --theme-primary-text: #F8FAFC; 
-  --theme-secondary-text: #94A3B8; 
-  --theme-muted: #64748B;        
-  
-  --theme-shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --theme-shadow-glow: 0 0 40px rgba(37, 99, 235, 0.3);
-  --theme-shadow-glow-sm: 0 0 20px rgba(37, 99, 235, 0.2);
-  --theme-shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(37,99,235,0.1);
-
-  /* Keyframes */
+@layer utilities {
   @keyframes marquee {
     0% { transform: translateX(0); }
     100% { transform: translateX(-50%); }
