@@ -96,7 +96,7 @@ export default function InterviewSetup({ value, onChange, onSubmit, isTechnical 
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Experience Level */}
           <div>
             <label className="block text-sm font-medium text-primary-text mb-2 flex items-center gap-2">
@@ -131,7 +131,7 @@ export default function InterviewSetup({ value, onChange, onSubmit, isTechnical 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Difficulty Level */}
           <div>
             <label className="block text-sm font-medium text-primary-text mb-2 flex items-center gap-2">

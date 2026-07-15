@@ -474,7 +474,7 @@ export default function SettingsPage() {
                 </p>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-surface border border-border">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-surface border border-border">
                     <div>
                       <p className="font-semibold text-sm">Export All Data</p>
                       <p className="text-xs text-muted mt-0.5">
@@ -490,7 +490,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-surface border border-border">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-surface border border-border">
                     <div>
                       <p className="font-semibold text-sm">Delete All Analyses</p>
                       <p className="text-xs text-muted mt-0.5">
@@ -506,7 +506,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-danger/5 border border-danger/30">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-danger/5 border border-danger/30">
                     <div>
                       <p className="font-semibold text-sm text-danger">Delete Account</p>
                       <p className="text-xs text-muted mt-0.5">

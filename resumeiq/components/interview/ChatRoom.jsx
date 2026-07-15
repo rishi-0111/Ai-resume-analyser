@@ -159,7 +159,7 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
   const visibleMessages = messages.filter(m => m.role !== 'system');
 
   return (
-    <div className="flex flex-col h-[75vh] bg-surface border border-border rounded-card shadow-sm overflow-hidden relative">
+    <div className="flex flex-col min-h-[450px] h-[calc(100vh-180px)] md:h-[75vh] bg-surface border border-border rounded-card shadow-sm overflow-hidden relative">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-background">
         <div className="flex items-center gap-3">
