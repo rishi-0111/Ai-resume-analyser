@@ -17,6 +17,7 @@ import {
   Bell,
   Briefcase,
   Compass,
+  X,
 } from "lucide-react";
 import { mockUser } from "@/lib/mock-data";
 import { useUser } from "@/lib/context/UserContext";
