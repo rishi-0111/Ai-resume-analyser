@@ -131,8 +131,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     localStorage.setItem("resumeiq_accent", accentColor);
-    // document.documentElement.style.setProperty('--primary', accentColor); // Simplified for now
-  }, [accentColor]);
+    if (mounted) {
+      document.documentElement.style.setProperty('--color-primary', accentColor);
+    }
+  }, [accentColor, mounted]);
 
   const handleExport = async () => {
     setIsExporting(true);
