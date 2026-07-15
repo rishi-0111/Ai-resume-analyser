@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
   Moon,
@@ -75,7 +75,6 @@ function SettingRow({ icon: Icon, title, description, right }) {
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
-  const supabase = createClient();
   
   const [activeTab, setActiveTab] = useState("appearance");
   const [accentColor, setAccentColor] = useState("#2563EB");
