@@ -34,29 +34,35 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
   }, [messages, isGenerating]);
 
   // Handle Speech Recognition (Web Speech API)
+  const initialInputRef = useRef("");
+
   useEffect(() => {
     let recognition = null;
     if (isListening) {
+      initialInputRef.current = input;
+      
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
-        recognition.interimResults = false;
+        recognition.interimResults = true;
         
         recognition.onresult = (event) => {
-          let currentTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            currentTranscript += event.results[i][0].transcript;
+          let transcript = "";
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
           }
-          setInput(prev => prev + " " + currentTranscript);
+          
+          setInput((initialInputRef.current + " " + transcript).trim());
           
           // Auto-submit silence detection
           if (isVoiceMode) {
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
             silenceTimerRef.current = setTimeout(() => {
-              // Trigger submit if we have input
-              const currentInput = document.getElementById("chat-input")?.value || "";
-              if (currentInput.trim()) {
+              // Use DOM element to avoid stale closures in setTimeout
+              const inputElem = document.getElementById("chat-input");
+              const currentInput = inputElem ? inputElem.value : "";
+              if (currentInput && currentInput.trim()) {
                 setIsListening(false);
                 onSendMessage(currentInput.trim());
                 setInput("");
@@ -129,15 +135,26 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
         }
       };
       
+      utterance.onerror = (e) => {
+        console.error("SpeechSynthesis error", e);
+        if (isVoiceMode) setIsListening(true);
+      };
+      
       // Slight delay to ensure UI updates smoothly before TTS blocks thread
-      setTimeout(() => synth.speak(utterance), 300);
+      setTimeout(() => {
+        try {
+          synth.speak(utterance);
+        } catch (e) {
+          console.error("Speak failed", e);
+        }
+      }, 300);
     }
     
     return () => {
       // Cleanup on unmount or mode switch
       window.speechSynthesis.cancel();
     };
-  }, [messages, isGenerating, isVoiceMode]);
+  }, [messages, isGenerating, isVoiceMode, interviewerPersona]);
 
   // Clean up speech synthesis when component unmounts
   useEffect(() => {
@@ -253,7 +270,7 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
 
       {/* Input Area */}
       <div className="p-4 bg-background border-t border-border">
-        <form onSubmit={handleSubmit} className="flex items-end gap-3">
+        <form id="chat-form" onSubmit={handleSubmit} className="flex items-end gap-3">
           <button
             type="button"
             onClick={() => setIsListening(!isListening)}

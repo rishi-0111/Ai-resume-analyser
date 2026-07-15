@@ -72,11 +72,20 @@ export function useInterview({ type = "hr" } = {}) {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || data.details || "Failed to initialize interview");
+        let errMessage = "Failed to initialize interview";
+        try {
+          const data = await res.json();
+          errMessage = data.error || data.details || errMessage;
+        } catch (e) {
+           // fallback if not json
+        }
+        throw new Error(errMessage);
       }
 
       const session = await res.json();
+      if (!session || !session.id) {
+         throw new Error("Invalid session returned from server");
+      }
       setSessionId(session.id);
       setMessages(session.messages || []);
       startedAtRef.current = Date.now();
@@ -113,8 +122,12 @@ export function useInterview({ type = "hr" } = {}) {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to send message");
+        let errMessage = "Failed to send message";
+        try {
+          const data = await res.json();
+          errMessage = data.error || errMessage;
+        } catch(e) {}
+        throw new Error(errMessage);
       }
 
       const { message } = await res.json();
@@ -149,8 +162,12 @@ export function useInterview({ type = "hr" } = {}) {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || data.details || "Failed to evaluate interview");
+        let errMessage = "Failed to evaluate interview";
+        try {
+          const data = await res.json();
+          errMessage = data.error || data.details || errMessage;
+        } catch(e) {}
+        throw new Error(errMessage);
       }
 
       const session = await res.json();
@@ -167,7 +184,7 @@ export function useInterview({ type = "hr" } = {}) {
 
   const retry = useCallback(() => {
     setError(null);
-    if (step === STEPS.GENERATING) {
+    if (step === STEPS.GENERATING || step === STEPS.SETUP) {
       generateInterview();
     } else if (step === STEPS.SUBMITTING) {
       submitInterview();
