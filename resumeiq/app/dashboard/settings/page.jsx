@@ -81,6 +81,7 @@ export default function SettingsPage() {
   const [accentColor, setAccentColor] = useState("#2563EB");
   
   // Persisted state
+  const [mounted, setMounted] = useState(false);
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -101,6 +102,7 @@ export default function SettingsPage() {
 
   // Load from localStorage on mount
   useEffect(() => {
+    setMounted(true);
     const savedNotifs = localStorage.getItem("resumeiq_notifications");
     if (savedNotifs) setNotifications(JSON.parse(savedNotifs));
     
@@ -247,7 +249,7 @@ export default function SettingsPage() {
                 <div className="mb-6">
                   <p className="text-sm font-medium mb-4">Theme</p>
                   <div className="grid grid-cols-3 gap-3">
-                    {[
+                    {mounted && [
                       { id: "light", label: "Light", icon: Sun },
                       { id: "dark", label: "Dark", icon: Moon },
                       { id: "system", label: "System", icon: Monitor },
