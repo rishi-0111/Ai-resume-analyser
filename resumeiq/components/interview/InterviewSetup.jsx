@@ -163,21 +163,37 @@ export default function InterviewSetup({ value, onChange, onSubmit, isTechnical 
 
         {/* Concepts to Focus On (Only for Voice Mode) */}
         {isVoice && (
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2 flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-yellow-500" /> Concepts to Focus On
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. React Hooks, Node.js Event Loop, System Design..."
-              value={value.concepts || ""}
-              onChange={(e) => onChange({ ...value, concepts: e.target.value })}
-              className="w-full bg-background border border-border rounded-button py-3 px-4 text-primary-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-            />
-            <p className="text-xs text-secondary-text mt-2">
-              Specify exact topics you want the AI to grill you on in this voice mock interview.
-            </p>
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium text-primary-text mb-2 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-yellow-500" /> Concepts to Focus On
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. React Hooks, Node.js Event Loop, System Design..."
+                value={value.concepts || ""}
+                onChange={(e) => onChange({ ...value, concepts: e.target.value })}
+                className="w-full bg-background border border-border rounded-button py-3 px-4 text-primary-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              />
+              <p className="text-xs text-secondary-text mt-2">
+                Specify exact topics you want the AI to grill you on in this voice mock interview.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-primary-text mb-2 flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-500" /> Interviewer Persona
+              </label>
+              <select
+                value={value.interviewerPersona || "Male"}
+                onChange={(e) => onChange({ ...value, interviewerPersona: e.target.value })}
+                className="w-full bg-background border border-border rounded-button py-3 px-4 text-primary-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
+              >
+                <option value="Male">Male Voice (e.g., David)</option>
+                <option value="Female">Female Voice (e.g., Sarah)</option>
+              </select>
+            </div>
+          </>
         )}
       </div>
 

@@ -16,7 +16,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { type, resumeId, jobTitle, jobDescription, domain, experienceLevel, targetCompany, difficulty, questionCount, concepts } = await request.json();
+    const { type, resumeId, jobTitle, jobDescription, domain, experienceLevel, targetCompany, difficulty, questionCount, concepts, interviewerPersona } = await request.json();
 
     if (!jobTitle) {
       return NextResponse.json({ error: "Missing required field: jobTitle" }, { status: 400 });
@@ -74,6 +74,12 @@ export async function POST(request) {
     if (concepts) contextPrompt += `CRITICAL: The user has explicitly requested you to focus heavily on the following specific concepts: [${concepts}]. Make sure the majority of your questions revolve around these topics.\n`;
     if (resumeText) contextPrompt += `\n--- CANDIDATE RESUME ---\n${resumeText}\n------------------------\n`;
     
+    if (interviewerPersona === 'Male') {
+      contextPrompt += `\nAdopt a male persona for this interview (e.g. David, John). Introduce yourself with a male name.`;
+    } else if (interviewerPersona === 'Female') {
+      contextPrompt += `\nAdopt a female persona for this interview (e.g. Sarah, Emma). Introduce yourself with a female name.`;
+    }
+
     contextPrompt += `\nBegin the interview now. Greet the candidate professionally, introduce yourself briefly, and ask the first question.`;
 
     const initialMessages = [
@@ -114,6 +120,7 @@ export async function POST(request) {
           target_company: targetCompany || null,
           difficulty: difficulty || 'Medium',
           question_count: questionCount || 5,
+          interviewer_persona: interviewerPersona || 'Male',
         },
         status: 'in_progress'
       })

@@ -114,6 +114,7 @@ export default function VoiceInterviewPage() {
             onEndInterview={submitInterview} 
             isGenerating={isGenerating}
             forceVoiceMode={true}
+            interviewerPersona={setupData.interviewerPersona}
           />
         </motion.div>
       )}

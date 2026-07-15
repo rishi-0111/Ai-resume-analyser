@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Mic, MicOff, StopCircle, User, Bot, Loader2, Volume2, VolumeX } from "lucide-react";
 
-export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGenerating, forceVoiceMode = false }) {
+export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGenerating, forceVoiceMode = false, interviewerPersona = "Male" }) {
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(forceVoiceMode);
@@ -67,6 +67,29 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
       synth.cancel(); // Stop anything currently playing
       
       const utterance = new SpeechSynthesisUtterance(lastMessage.content);
+      
+      // Voice Selection
+      const voices = synth.getVoices();
+      if (voices.length > 0) {
+        let selectedVoice = null;
+        const maleKeywords = ['david', 'mark', 'daniel', 'alex', 'male', 'guy', 'arthur', 'aaron'];
+        const femaleKeywords = ['zira', 'hazel', 'samantha', 'victoria', 'female', 'girl', 'catherine', 'karen', 'moira', 'tessa'];
+        
+        if (interviewerPersona === 'Female') {
+          selectedVoice = voices.find(v => femaleKeywords.some(k => v.name.toLowerCase().includes(k))) || voices.find(v => v.name.toLowerCase().includes('female'));
+        } else {
+          selectedVoice = voices.find(v => maleKeywords.some(k => v.name.toLowerCase().includes(k))) || voices.find(v => v.name.toLowerCase().includes('male'));
+        }
+        
+        // Fallback to first available English voice if no specific match
+        if (!selectedVoice) {
+          selectedVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+        }
+        
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+      }
       
       utterance.onend = () => {
         // When AI finishes speaking, automatically turn on the microphone

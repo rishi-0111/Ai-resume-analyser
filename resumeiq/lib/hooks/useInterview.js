@@ -22,7 +22,8 @@ export function useInterview({ type = "hr" } = {}) {
     targetCompany: "",
     concepts: "",
     difficulty: "Medium",
-    questionCount: 5
+    questionCount: 5,
+    interviewerPersona: "Male"
   });
   const [messages, setMessages] = useState([]);
   const [sessionId, setSessionId] = useState(null);
@@ -65,7 +66,8 @@ export function useInterview({ type = "hr" } = {}) {
           targetCompany: setupData.targetCompany,
           concepts: setupData.concepts,
           difficulty: setupData.difficulty,
-          questionCount: setupData.questionCount
+          questionCount: setupData.questionCount,
+          interviewerPersona: setupData.interviewerPersona
         }),
       });
 
@@ -172,7 +174,7 @@ export function useInterview({ type = "hr" } = {}) {
   const reset = useCallback(() => {
     setStep(STEPS.SELECT_RESUME);
     setSelectedResume(null);
-    setSetupData({ role: "", domain: "", experienceLevel: "", targetCompany: "", concepts: "", difficulty: "Medium", questionCount: 5 });
+    setSetupData({ role: "", domain: "", experienceLevel: "", targetCompany: "", concepts: "", difficulty: "Medium", questionCount: 5, interviewerPersona: "Male" });
     setMessages([]);
     setSessionId(null);
     setResults(null);
