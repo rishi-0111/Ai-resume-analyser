@@ -55,16 +55,23 @@ export default function ResumeSelector({ selected, onSelect }) {
 
   if (resumes.length === 0) {
     return (
-      <div className="text-center py-16">
+      <div className="text-center py-16 max-w-sm mx-auto">
         <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
           <FileText className="w-8 h-8 text-primary" />
         </div>
         <h3 className="font-heading font-semibold text-lg text-primary-text mb-1">
           No Resumes Found
         </h3>
-        <p className="text-secondary-text text-sm">
-          Upload a resume first to start an interview.
+        <p className="text-secondary-text text-sm mb-6">
+          Upload a resume first to start an interview, or skip to have a general interview.
         </p>
+        <button
+          onClick={() => onSelect({ id: "skip", file_name: "General Interview (No Resume)" })}
+          className="w-full py-3 px-4 border-2 border-dashed border-border rounded-button text-sm font-medium hover:border-primary/30 hover:bg-surface transition-all flex items-center justify-center gap-2"
+        >
+          <Sparkles className="w-4 h-4 text-primary" />
+          Skip Resume
+        </button>
       </div>
     );
   }
