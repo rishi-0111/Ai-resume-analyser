@@ -21,16 +21,24 @@ import { useUser } from "@/lib/context/UserContext";
 import { supabase } from "@/lib/supabase/client";
 import { useTheme } from "next-themes";
 
-const initialNotifications = [
-  { id: 1, text: "Your resume score improved by 14 points!", time: "2h ago", unread: true },
-  { id: 2, text: "New job match found: Senior Engineer at Linear", time: "5h ago", unread: true },
-  { id: 3, text: "Analysis complete for Vercel position", time: "1d ago", unread: false },
-];
+function formatTimeAgo(dateString) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  
+  if (diffInSeconds < 60) return 'just now';
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  return `${diffInDays}d ago`;
+}
 
 export default function TopNavbar({ onMenuClick }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState([]);
   const { user } = useUser();
   
   const { theme, setTheme } = useTheme();
@@ -39,6 +47,53 @@ export default function TopNavbar({ onMenuClick }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchNotifications = async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (data && !error) {
+        setNotifications(data);
+      }
+    };
+
+    fetchNotifications();
+
+    const channel = supabase
+      .channel('realtime_notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setNotifications((prev) => [payload.new, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === payload.new.id ? payload.new : n))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const userName = user?.user_metadata?.full_name || mockUser.name;
   const userEmail = user?.email || mockUser.email;
@@ -54,15 +109,19 @@ export default function TopNavbar({ onMenuClick }) {
     window.location.href = "/login";
   };
 
-  const clearNotifications = () => {
+  const clearNotifications = async () => {
+    if (!user) return;
+    await supabase.from('notifications').delete().eq('user_id', user.id);
     setNotifications([]);
   };
 
-  const markAllRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+  const markAllRead = async () => {
+    if (!user) return;
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+    setNotifications(notifications.map(n => ({ ...n, is_read: true })));
   };
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
     <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 transition-colors duration-200">
@@ -156,18 +215,19 @@ export default function TopNavbar({ onMenuClick }) {
                     <div
                       key={n.id}
                       className={`p-4 hover:bg-surface transition-colors cursor-pointer ${
-                        n.unread ? "bg-primary/5" : ""
+                        !n.is_read ? "bg-primary/5" : ""
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        {n.unread && (
+                        {!n.is_read && (
                           <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />
                         )}
-                        <div className={n.unread ? "" : "ml-5"}>
+                        <div className={!n.is_read ? "" : "ml-5"}>
                           <p className="text-sm text-primary-text leading-snug">
-                            {n.text}
+                            {n.title || n.text}
                           </p>
-                          <p className="text-xs text-muted mt-1">{n.time}</p>
+                          {n.message && <p className="text-xs text-secondary-text mt-0.5">{n.message}</p>}
+                          <p className="text-xs text-muted mt-1">{formatTimeAgo(n.created_at)}</p>
                         </div>
                       </div>
                     </div>

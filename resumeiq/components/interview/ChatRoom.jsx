@@ -25,7 +25,7 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
       if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
-        recognition.interimResults = true;
+        recognition.interimResults = false;
         
         recognition.onresult = (event) => {
           let currentTranscript = "";
