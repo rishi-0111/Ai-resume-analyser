@@ -1,14 +1,14 @@
-import nvidiaClient from "./nvidia";
+import { GoogleGenAI } from "@google/genai";
 
 /**
- * Reusable function to call the NVIDIA NIM API with advanced error handling.
+ * Reusable function to call the Gemini API with advanced error handling.
  * 
  * @param {Object} params
  * @param {string} params.systemPrompt - The system instructions for the AI.
  * @param {string} params.userPrompt - The user's input.
  * @param {number} [params.temperature=0.7] - The model temperature.
  * @param {number} [params.maxTokens=1024] - The maximum number of tokens to generate.
- * @param {string} [params.model="meta/llama-3.1-70b-instruct"] - The NIM model to use.
+ * @param {string} [params.model="gemini-2.5-flash"] - The Gemini model to use.
  * @param {Array} [params.messages] - Optional array of message objects to support full chat history.
  * @param {boolean} [params.isJson=true] - Whether to parse the response as JSON.
  * @returns {Promise<any>} The parsed JSON response or raw string.
@@ -19,39 +19,61 @@ export async function generateAIResponse({
   messages,
   temperature = 0.7,
   maxTokens = 2048,
-  model = "meta/llama-3.1-70b-instruct", // A solid default model available on NVIDIA NIM
+  model = "gemini-2.5-flash",
   isJson = true,
 }) {
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
-  const TIMEOUT_MS = 60000; // 60 seconds
+
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       console.log(`[AI Provider] Generating response (Attempt ${attempt}/${MAX_RETRIES}) for model: ${model}`);
       
-      // Implement timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      let sysInstruction = systemPrompt;
+      let contents = [];
 
-      // Determine messages array
-      const apiMessages = messages || [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ];
+      if (messages && messages.length > 0) {
+        // Find system prompt in messages if it exists
+        const sysMsg = messages.find(m => m.role === 'system');
+        if (sysMsg) {
+          sysInstruction = sysMsg.content;
+        }
 
-      const response = await nvidiaClient.chat.completions.create({
+        // Map messages to Gemini format (user/model)
+        contents = messages
+          .filter(m => m.role !== 'system')
+          .map(m => {
+            let role = m.role === 'assistant' ? 'model' : m.role;
+            // Fallback for roles like 'system' that slipped through
+            if (role !== 'user' && role !== 'model') {
+               role = 'user';
+            }
+            return {
+              role: role,
+              parts: [{ text: m.content || " " }]
+            };
+          });
+      } else {
+        contents = [{ role: "user", parts: [{ text: userPrompt || " " }] }];
+      }
+
+      const response = await ai.models.generateContent({
         model,
-        messages: apiMessages,
-        temperature,
-        max_tokens: maxTokens,
-      }, {
-        signal: controller.signal
+        contents,
+        config: {
+          systemInstruction: sysInstruction,
+          responseMimeType: isJson ? "application/json" : "text/plain",
+          temperature,
+          maxOutputTokens: maxTokens,
+        },
       });
 
-      clearTimeout(timeoutId);
-
-      const responseText = response.choices[0]?.message?.content || "";
+      const responseText = response.text || "";
 
       if (!isJson) {
         return responseText.trim();
@@ -89,12 +111,11 @@ export async function generateAIResponse({
     } catch (error) {
       console.error(`[AI Provider] Error on attempt ${attempt}:`, error.message);
       
-      const isRateLimit = error.status === 429;
-      const isTimeout = error.name === 'AbortError';
-      const isTransient = error.status >= 500;
+      const isRateLimit = error.message?.includes('429');
+      const isTransient = error.message?.includes('50') || error.message?.includes('timeout');
 
-      if ((isRateLimit || isTransient || isTimeout) && attempt < MAX_RETRIES) {
-        const delay = isRateLimit ? RETRY_DELAY_MS * attempt * 2 : RETRY_DELAY_MS; // Exponential backoff for rate limits
+      if ((isRateLimit || isTransient) && attempt < MAX_RETRIES) {
+        const delay = isRateLimit ? RETRY_DELAY_MS * attempt * 2 : RETRY_DELAY_MS;
         console.log(`[AI Provider] Retrying in ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;

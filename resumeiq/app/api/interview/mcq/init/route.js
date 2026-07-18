@@ -28,13 +28,29 @@ export async function POST(request) {
     if (resumeId) {
       const { data: resume } = await supabase
         .from('resumes')
-        .select('file_path')
+        .select('raw_text, file_path, file_name')
         .eq('id', resumeId)
         .eq('user_id', user.id)
         .single();
       
       if (resume) {
-        resumeText = await extractTextFromFile(resume.file_path);
+        resumeText = resume.raw_text;
+        
+        if (!resumeText && resume.file_path) {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from("resumes")
+            .download(resume.file_path);
+            
+          if (!downloadError && fileData) {
+            try {
+              const arrayBuffer = await fileData.arrayBuffer();
+              const nodeBuffer = Buffer.from(arrayBuffer);
+              resumeText = await extractTextFromFile(nodeBuffer, resume.file_name);
+            } catch (e) {
+              console.error("Failed to extract text from file:", e);
+            }
+          }
+        }
       }
     }
 

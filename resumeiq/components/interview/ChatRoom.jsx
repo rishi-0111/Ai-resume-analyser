@@ -38,41 +38,47 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
 
   useEffect(() => {
     let recognition = null;
+    let finalTranscript = "";
+
     if (isListening) {
-      initialInputRef.current = input;
+      finalTranscript = input; // start with existing text
       
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
+        recognition.lang = 'en-US'; // explicitly set language to improve accuracy
         
         recognition.onresult = (event) => {
-          let transcript = "";
-          for (let i = 0; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
+          let interimTranscript = "";
+          let newFinalTranscript = "";
+          
+          // Only process NEW results starting from resultIndex
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              newFinalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
           }
           
-          setInput((initialInputRef.current + " " + transcript).trim());
-          
-          // Auto-submit silence detection
-          if (isVoiceMode) {
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = setTimeout(() => {
-              // Use DOM element to avoid stale closures in setTimeout
-              const inputElem = document.getElementById("chat-input");
-              const currentInput = inputElem ? inputElem.value : "";
-              if (currentInput && currentInput.trim()) {
-                setIsListening(false);
-                onSendMessage(currentInput.trim());
-                setInput("");
-              }
-            }, 2500); // 2.5 seconds of silence
+          // If we got final words, lock them in
+          if (newFinalTranscript) {
+             finalTranscript = (finalTranscript + " " + newFinalTranscript).trim();
           }
+          
+          // Display the locked-in words plus whatever it's currently guessing
+          setInput((finalTranscript + " " + interimTranscript).trim());
         };
 
         recognition.onend = () => {
-          if (isListening) recognition.start(); // Keep listening if active
+          if (isListening) {
+            // The browser paused processing. We restart it. 
+            // `finalTranscript` is already accurately tracking the final words.
+            // When start() is called, event.resultIndex will reset for the new session.
+            recognition.start();
+          }
         };
 
         recognition.start();
@@ -82,7 +88,6 @@ export default function ChatRoom({ messages, onSendMessage, onEndInterview, isGe
       }
     }
     return () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (recognition) {
         recognition.onend = null;
         recognition.stop();
